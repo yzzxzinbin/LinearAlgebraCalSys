@@ -1,0 +1,11 @@
+.vscode/
+*.xlsx
+*.txt
+/build
+/res
+/bin
+GetStart.md
+/devtool/__pycache__
+*.log
+Doxyfile
+/devtool
