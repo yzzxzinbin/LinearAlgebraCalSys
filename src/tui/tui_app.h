@@ -57,6 +57,12 @@ private:
     // 历史记录导航
     void navigateHistory(bool up);
     
+    // 清除结果区域
+    void clearResultArea();
+    
+    // 显示变量值
+    void showVariable(const std::string& varName);
+    
     // 绘制UI元素
     void drawHeader();
     void drawInputPrompt();

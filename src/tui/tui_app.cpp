@@ -143,8 +143,23 @@ void TuiApp::executeCommand(const std::string& input) {
         
         LOG_INFO("执行命令: " + input);
         
+        // 每次执行命令前先清除结果区域
+        clearResultArea();
+        
         // 预处理输入，处理特殊情况
         std::string processedInput = input;
+        
+        // 处理show命令
+        if (processedInput.substr(0, 4) == "show" && processedInput.length() > 5) {
+            std::string varName = processedInput.substr(5);
+            // 去除可能的结尾分号
+            if (!varName.empty() && varName.back() == ';') {
+                varName.pop_back();
+            }
+            
+            showVariable(varName);
+            return;
+        }
         
         // 如果是纯命令如help、clear等，确保以分号结尾
         if (processedInput.find('=') == std::string::npos && 
@@ -412,16 +427,64 @@ void TuiApp::drawStatusBar() {
     Terminal::resetColor();
 }
 
-void TuiApp::drawResultArea() {
-    Terminal::setCursor(2, 0);
-    Terminal::setForeground(Color::YELLOW);
-    std::cout << "输出区域:" << std::endl;
-    Terminal::resetColor();
-    
+void TuiApp::clearResultArea() {
     // 清空结果区域
     for (int i = resultRow; i < inputRow; i++) {
         Terminal::setCursor(i, 0);
         std::string spaces(terminalCols, ' ');
         std::cout << spaces;
     }
+    
+    // 重新绘制结果区域标题
+    Terminal::setCursor(2, 0);
+    Terminal::setForeground(Color::YELLOW);
+    std::cout << "输出区域:" << std::endl;
+    Terminal::resetColor();
+}
+
+void TuiApp::showVariable(const std::string& varName) {
+    const auto& vars = interpreter.getVariables();
+    auto it = vars.find(varName);
+    
+    Terminal::setCursor(resultRow, 0);
+    
+    if (it == vars.end()) {
+        Terminal::setForeground(Color::RED);
+        std::cout << "错误: 变量 '" << varName << "' 未定义。" << std::endl;
+        Terminal::resetColor();
+        
+        // 更新状态消息
+        statusMessage = "变量未找到: " + varName;
+        return;
+    }
+    
+    Terminal::setForeground(Color::GREEN);
+    std::cout << "> show " << varName << std::endl;
+    Terminal::resetColor();
+    
+    Terminal::setForeground(Color::CYAN);
+    std::cout << varName << " = ";
+    
+    switch (it->second.type) {
+        case VariableType::FRACTION:
+            std::cout << it->second.fractionValue << std::endl;
+            break;
+        case VariableType::VECTOR:
+            std::cout << std::endl;
+            it->second.vectorValue.print();
+            break;
+        case VariableType::MATRIX:
+            std::cout << std::endl;
+            it->second.matrixValue.print();
+            break;
+    }
+    
+    Terminal::resetColor();
+    
+    // 更新状态消息
+    statusMessage = "显示变量: " + varName;
+}
+
+void TuiApp::drawResultArea() {
+    clearResultArea();
 }

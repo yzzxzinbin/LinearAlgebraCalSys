@@ -37,6 +37,7 @@ void Interpreter::executeCommand(const std::string& command, const std::vector<s
         std::cout << "  help             - 显示此帮助信息\n";
         std::cout << "  clear            - 清屏\n";
         std::cout << "  vars             - 显示所有变量\n";
+        std::cout << "  show <变量名>     - 显示特定变量的值\n";
         std::cout << "  exit             - 退出程序\n";
         std::cout << "  steps            - 显示计算步骤\n";
         std::cout << "\n";

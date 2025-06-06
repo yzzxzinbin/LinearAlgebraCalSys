@@ -8,7 +8,8 @@ static const std::unordered_map<std::string, bool> keywords = {
     {"clear", true},
     {"vars", true},
     {"exit", true},
-    {"steps", true}
+    {"steps", true},
+    {"show", true}  // 添加新的关键字
 };
 
 Tokenizer::Tokenizer(const std::string& input) : input(input), position(0) {}
