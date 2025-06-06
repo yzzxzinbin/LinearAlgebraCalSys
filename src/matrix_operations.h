@@ -39,4 +39,12 @@ public:
     // 新增：按行列展开计算行列式
     static Fraction determinantByExpansion(const Matrix& mat);
     static Fraction determinantByExpansion(const Matrix& mat, ExpansionHistory& history);
+    
+    // 新增：计算逆矩阵 (伴随矩阵法)
+    static Matrix inverse(const Matrix& mat);
+    static Matrix inverse(const Matrix& mat, OperationHistory& history);
+    
+    // 新增：计算逆矩阵 (高斯-若尔当消元法)
+    static Matrix inverseGaussJordan(const Matrix& mat);
+    static Matrix inverseGaussJordan(const Matrix& mat, OperationHistory& history);
 };

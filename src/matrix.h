@@ -51,4 +51,13 @@ public:
     
     // 新增辅助方法：查找零元素最多的行或列
     std::pair<bool, size_t> findOptimalExpansionIndex() const;
+
+    // 新增方法：创建增广矩阵 [A|B]
+    Matrix augment(const Matrix& B) const;
+    
+    // 新增方法：创建与当前矩阵同维度的单位矩阵
+    static Matrix identity(size_t n);
+    
+    // 新增辅助方法：从增广矩阵中提取右侧部分
+    Matrix extractRightPart(size_t colStart) const;
 };

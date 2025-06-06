@@ -138,6 +138,9 @@ Fraction cofactor(size_t row, size_t col) const;    // 计算指定位置的代�
 Matrix cofactorMatrix() const;                      // 计算代数余子式矩阵
 Matrix adjugate() const;                            // 计算伴随矩阵
 Fraction determinantByExpansion() const;            // 按行列式展开法计算行列式
+Matrix augment(const Matrix& B) const;              // 创建增广矩阵 [A|B]
+static Matrix identity(size_t n);                   // 创建n阶单位矩阵
+Matrix extractRightPart(size_t colStart) const;     // 从增广矩阵中提取右侧部分
 ```
 
 ## 矩阵操作类 (MatrixOperations)
@@ -181,7 +184,11 @@ static Fraction determinant(const Matrix& mat, OperationHistory& history);  // �
 static Matrix cofactorMatrix(const Matrix& mat);              // 计算代数余子式矩阵
 static Matrix adjugate(const Matrix& mat);                    // 计算伴随矩阵
 static Fraction determinantByExpansion(const Matrix& mat);    // 按行列式展开法计算行列式
-static Fraction determinantByExpansion(const Matrix& mat, ExpansionHistory& history); // 按行列式展开法计算行列式(带历史记录)
+static Fraction determinantByExpansion(const Matrix& mat, ExpansionHistory& history); // 带历史记录
+static Matrix inverse(const Matrix& mat);                     // 计算逆矩阵(伴随矩阵法)
+static Matrix inverse(const Matrix& mat, OperationHistory& history); // 带历史记录
+static Matrix inverseGaussJordan(const Matrix& mat);          // 计算逆矩阵(高斯-若尔当消元法)
+static Matrix inverseGaussJordan(const Matrix& mat, OperationHistory& history); // 带历史记录
 ```
 
 ## 操作步骤与历史记录
@@ -527,6 +534,62 @@ int main() {
     history.printAll();
     
     std::cout << "行列式值 = " << det << std::endl;
+    
+    return 0;
+}
+```
+
+### 逆矩阵计算示例
+
+```cpp
+#include "matrix.h"
+#include "matrix_operations.h"
+#include "operation_step.h"
+#include <iostream>
+
+int main() {
+    // 创建矩阵
+    Matrix A(3, 3);
+    A.at(0, 0) = Fraction(1); A.at(0, 1) = Fraction(2); A.at(0, 2) = Fraction(3);
+    A.at(1, 0) = Fraction(0); A.at(1, 1) = Fraction(1); A.at(1, 2) = Fraction(4);
+    A.at(2, 0) = Fraction(5); A.at(2, 1) = Fraction(6); A.at(2, 2) = Fraction(0);
+    
+    std::cout << "原始矩阵 A:" << std::endl;
+    A.print();
+    
+    // 使用伴随矩阵法计算逆矩阵
+    OperationHistory history1;
+    try {
+        Matrix inv1 = MatrixOperations::inverse(A, history1);
+        std::cout << "使用伴随矩阵法计算 A 的逆矩阵:" << std::endl;
+        history1.printAll();
+        std::cout << "A^(-1) = " << std::endl;
+        inv1.print();
+        
+        // 验证 A * A^(-1) = I
+        Matrix I1 = A * inv1;
+        std::cout << "验证 A * A^(-1) = " << std::endl;
+        I1.print();
+    } catch (const std::exception& e) {
+        std::cout << "错误: " << e.what() << std::endl;
+    }
+    
+    // 使用高斯-若尔当消元法计算逆矩阵
+    OperationHistory history2;
+    try {
+        Matrix inv2 = MatrixOperations::inverseGaussJordan(A, history2);
+        std::cout << "使用高斯-若尔当消元法计算 A 的逆矩阵:" << std::endl;
+        history2.printAll();
+        std::cout << "A^(-1) = " << std::endl;
+        inv2.print();
+        
+        // 验证 A * A^(-1) = I
+        Matrix I2 = A * inv2;
+        std::cout << "验证 A * A^(-1) = " << std::endl;
+        I2.print();
+    } catch (const std::exception& e) {
+        std::cout << "错误: " << e.what() << std::endl;
+    }
     
     return 0;
 }

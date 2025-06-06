@@ -431,3 +431,215 @@ Fraction MatrixOperations::determinantByExpansion(const Matrix& mat) {
 Fraction MatrixOperations::determinantByExpansion(const Matrix& mat, ExpansionHistory& history) {
     return mat.determinantByExpansion(history);
 }
+
+// 计算逆矩阵 (伴随矩阵法) - 不带历史记录
+Matrix MatrixOperations::inverse(const Matrix& mat) {
+    OperationHistory dummy;
+    return inverse(mat, dummy);
+}
+
+// 计算逆矩阵 (伴随矩阵法) - 带历史记录
+Matrix MatrixOperations::inverse(const Matrix& mat, OperationHistory& history) {
+    if (mat.rowCount() != mat.colCount()) {
+        throw std::invalid_argument("Inverse can only be calculated for square matrices");
+    }
+    
+    // 记录初始状态
+    history.addStep(OperationStep(
+        OperationType::INITIAL_STATE,
+        "计算逆矩阵 (伴随矩阵法) - 初始矩阵:",
+        mat
+    ));
+    
+    // 计算行列式
+    Fraction det = determinant(mat);
+    
+    // 检查矩阵是否可逆
+    if (det == Fraction(0)) {
+        std::stringstream ss;
+        ss << "矩阵不可逆，行列式为0";
+        history.addStep(OperationStep(
+            OperationType::RESULT_STATE,
+            ss.str(),
+            mat
+        ));
+        throw std::runtime_error("Matrix is not invertible (determinant is zero)");
+    }
+    
+    // 计算伴随矩阵
+    Matrix adj = adjugate(mat);
+    
+    std::stringstream ss1;
+    ss1 << "计算行列式值: " << det;
+    history.addStep(OperationStep(
+        OperationType::RESULT_STATE,
+        ss1.str(),
+        mat
+    ));
+    
+    std::stringstream ss2;
+    ss2 << "计算伴随矩阵:";
+    history.addStep(OperationStep(
+        OperationType::RESULT_STATE,
+        ss2.str(),
+        adj
+    ));
+    
+    // 计算逆矩阵 A^(-1) = adj(A) / det(A)
+    Matrix result = adj;
+    for (size_t i = 0; i < result.rowCount(); ++i) {
+        for (size_t j = 0; j < result.colCount(); ++j) {
+            result.at(i, j) = result.at(i, j) / det;
+        }
+    }
+    
+    std::stringstream ss3;
+    ss3 << "计算逆矩阵 A^(-1) = adj(A) / det(A) = adj(A) / " << det;
+    history.addStep(OperationStep(
+        OperationType::RESULT_STATE,
+        ss3.str(),
+        result
+    ));
+    
+    return result;
+}
+
+// 计算逆矩阵 (高斯-若尔当消元法) - 不带历史记录
+Matrix MatrixOperations::inverseGaussJordan(const Matrix& mat) {
+    OperationHistory dummy;
+    return inverseGaussJordan(mat, dummy);
+}
+
+// 计算逆矩阵 (高斯-若尔当消元法) - 带历史记录
+Matrix MatrixOperations::inverseGaussJordan(const Matrix& mat, OperationHistory& history) {
+    if (mat.rowCount() != mat.colCount()) {
+        throw std::invalid_argument("Inverse can only be calculated for square matrices");
+    }
+    
+    size_t n = mat.rowCount();
+    
+    // 创建单位矩阵 I
+    Matrix identity = Matrix::identity(n);
+    
+    // 创建增广矩阵 [A|I]
+    Matrix augmented = mat.augment(identity);
+    
+    // 记录初始状态
+    std::stringstream ss_init;
+    ss_init << "计算逆矩阵 (高斯-若尔当消元法) - 创建增广矩阵 [A|I]:";
+    history.addStep(OperationStep(
+        OperationType::INITIAL_STATE,
+        ss_init.str(),
+        augmented
+    ));
+    
+    // 应用高斯-若尔当消元法
+    size_t lead = 0;
+    
+    // 前向消元：将左侧矩阵化为上三角形
+    for (size_t r = 0; r < n; ++r) {
+        if (lead >= n) {
+            break;
+        }
+        
+        size_t i = r;
+        
+        // 找到当前列中第一个非零元素的行
+        while (i < n && augmented.at(i, lead) == Fraction(0)) {
+            ++i;
+        }
+        
+        if (i == n) {
+            // 当前列全为0，表示矩阵不可逆
+            std::stringstream ss;
+            ss << "矩阵不可逆，无法完成消元";
+            history.addStep(OperationStep(
+                OperationType::RESULT_STATE,
+                ss.str(),
+                augmented
+            ));
+            throw std::runtime_error("Matrix is not invertible");
+        }
+        
+        // 如果主元不在当前行，交换行
+        if (i != r) {
+            for (size_t j = 0; j < augmented.colCount(); ++j) {
+                Fraction temp = augmented.at(r, j);
+                augmented.at(r, j) = augmented.at(i, j);
+                augmented.at(i, j) = temp;
+            }
+            
+            std::stringstream ss;
+            ss << "交换第 " << (r + 1) << " 行和第 " << (i + 1) << " 行";
+            history.addStep(OperationStep(
+                OperationType::SWAP_ROWS,
+                ss.str(),
+                augmented,
+                r, i
+            ));
+        }
+        
+        // 将主元归一化
+        Fraction pivot = augmented.at(r, lead);
+        if (pivot == Fraction(0)) {
+            // 如果主元为0，则矩阵不可逆
+            std::stringstream ss;
+            ss << "主元为0，矩阵不可逆";
+            history.addStep(OperationStep(
+                OperationType::RESULT_STATE,
+                ss.str(),
+                augmented
+            ));
+            throw std::runtime_error("Matrix is not invertible (zero pivot encountered)");
+        }
+        
+        for (size_t j = 0; j < augmented.colCount(); ++j) {
+            augmented.at(r, j) = augmented.at(r, j) / pivot;
+        }
+        
+        std::stringstream ss;
+        ss << "将第 " << (r + 1) << " 行除以主元 " << pivot;
+        history.addStep(OperationStep(
+            OperationType::SCALE_ROW,
+            ss.str(),
+            augmented,
+            r, -1, Fraction(1) / pivot
+        ));
+        
+        // 消去其他行的相应元素
+        for (size_t i = 0; i < n; ++i) {
+            if (i != r) {
+                Fraction factor = augmented.at(i, lead);
+                if (factor != Fraction(0)) {
+                    for (size_t j = 0; j < augmented.colCount(); ++j) {
+                        augmented.at(i, j) = augmented.at(i, j) - augmented.at(r, j) * factor;
+                    }
+                    
+                    std::stringstream ss2;
+                    ss2 << "将第 " << (r + 1) << " 行乘以 " << -factor << " 加到第 " << (i + 1) << " 行";
+                    history.addStep(OperationStep(
+                        OperationType::ADD_SCALED_ROW,
+                        ss2.str(),
+                        augmented,
+                        i, r, -factor
+                    ));
+                }
+            }
+        }
+        
+        ++lead;
+    }
+    
+    // 从增广矩阵中提取右侧部分，即逆矩阵
+    Matrix inverse = augmented.extractRightPart(n);
+    
+    std::stringstream ss_final;
+    ss_final << "逆矩阵计算完成:";
+    history.addStep(OperationStep(
+        OperationType::RESULT_STATE,
+        ss_final.str(),
+        inverse
+    ));
+    
+    return inverse;
+}

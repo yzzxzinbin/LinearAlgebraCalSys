@@ -474,3 +474,56 @@ Fraction Matrix::determinantByExpansion(ExpansionHistory& history) const {
     
     return result;
 }
+
+// 创建增广矩阵 [A|B]
+Matrix Matrix::augment(const Matrix& B) const {
+    if (rows != B.rows) {
+        throw std::invalid_argument("Cannot augment matrices with different row counts");
+    }
+    
+    Matrix result(rows, cols + B.cols);
+    
+    // 复制当前矩阵 A 到结果的左侧
+    for (size_t i = 0; i < rows; ++i) {
+        for (size_t j = 0; j < cols; ++j) {
+            result.at(i, j) = at(i, j);
+        }
+    }
+    
+    // 复制矩阵 B 到结果的右侧
+    for (size_t i = 0; i < rows; ++i) {
+        for (size_t j = 0; j < B.cols; ++j) {
+            result.at(i, cols + j) = B.at(i, j);
+        }
+    }
+    
+    return result;
+}
+
+// 创建与当前矩阵同维度的单位矩阵
+Matrix Matrix::identity(size_t n) {
+    Matrix result(n, n);
+    
+    for (size_t i = 0; i < n; ++i) {
+        result.at(i, i) = Fraction(1);
+    }
+    
+    return result;
+}
+
+// 从增广矩阵中提取右侧部分
+Matrix Matrix::extractRightPart(size_t colStart) const {
+    if (colStart >= cols) {
+        throw std::invalid_argument("Starting column index out of range");
+    }
+    
+    Matrix result(rows, cols - colStart);
+    
+    for (size_t i = 0; i < rows; ++i) {
+        for (size_t j = 0; j < cols - colStart; ++j) {
+            result.at(i, j) = at(i, colStart + j);
+        }
+    }
+    
+    return result;
+}
