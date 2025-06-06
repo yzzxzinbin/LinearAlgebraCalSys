@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <iostream>
+#include <cmath>
 #include "fraction.h"
 
 class Vector {
@@ -20,4 +21,16 @@ public:
     Vector operator+(const Vector& rhs) const;
     Vector operator-(const Vector& rhs) const;
     Vector operator*(const Fraction& k) const;
+    
+    // 新增：向量点乘（返回标量）
+    Fraction dot(const Vector& rhs) const;
+    
+    // 新增：向量叉乘（仅适用于三维向量，返回向量）
+    Vector cross(const Vector& rhs) const;
+    
+    // 新增：计算向量的模（长度/范数）
+    Fraction norm() const;
+    
+    // 新增：向量归一化（返回单位向量）
+    Vector normalize() const;
 };

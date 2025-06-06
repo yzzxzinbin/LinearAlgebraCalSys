@@ -26,10 +26,33 @@ void Matrix::input(std::istream& is) {
 }
 
 void Matrix::print(std::ostream& os) const {
+    const int field_width = 8; // Define field width for each element
+
     for (size_t i = 0; i < rows; ++i) {
         os << "| ";
         for (size_t j = 0; j < cols; ++j) {
-            os << std::setw(8) << data[i][j] << " ";
+            std::ostringstream oss;
+            oss << data[i][j];
+            std::string s = oss.str();
+
+            int len = s.length();
+            int padding_total = field_width - len;
+
+            if (padding_total < 0) { // String is wider than field
+                os << s; 
+            } else {
+                int padding_left = padding_total / 2;
+                int padding_right = padding_total - padding_left;
+
+                for (int k = 0; k < padding_left; ++k) {
+                    os << ' ';
+                }
+                os << s;
+                for (int k = 0; k < padding_right; ++k) {
+                    os << ' ';
+                }
+            }
+            os << " "; // Separator space after the element
         }
         os << "|\n";
     }
@@ -57,6 +80,24 @@ Matrix Matrix::operator*(const Fraction& k) const {
         for (size_t j = 0; j < cols; ++j)
             res.data[i][j] = data[i][j] * k;
     return res;
+}
+
+Matrix Matrix::operator*(const Matrix& rhs) const {
+    if (cols != rhs.rows) {
+        throw std::invalid_argument("Matrix multiplication error: dimensions mismatch.");
+    }
+    
+    Matrix result(rows, rhs.cols);
+    for (size_t i = 0; i < rows; ++i) {
+        for (size_t j = 0; j < rhs.cols; ++j) {
+            Fraction sum;
+            for (size_t k = 0; k < cols; ++k) {
+                sum += data[i][k] * rhs.data[k][j];
+            }
+            result.data[i][j] = sum;
+        }
+    }
+    return result;
 }
 
 Matrix Matrix::transpose() const {
