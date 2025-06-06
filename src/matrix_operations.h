@@ -1,6 +1,7 @@
 #pragma once
 #include "matrix.h"
 #include "operation_step.h"
+#include "determinant_expansion.h"
 
 class MatrixOperations {
 public:
@@ -28,4 +29,14 @@ public:
     // 计算方阵的行列式
     static Fraction determinant(const Matrix& mat);
     static Fraction determinant(const Matrix& mat, OperationHistory& history);
+    
+    // 新增：计算代数余子式矩阵
+    static Matrix cofactorMatrix(const Matrix& mat);
+    
+    // 新增：计算伴随矩阵
+    static Matrix adjugate(const Matrix& mat);
+    
+    // 新增：按行列展开计算行列式
+    static Fraction determinantByExpansion(const Matrix& mat);
+    static Fraction determinantByExpansion(const Matrix& mat, ExpansionHistory& history);
 };

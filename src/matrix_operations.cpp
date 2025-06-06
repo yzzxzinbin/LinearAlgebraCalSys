@@ -411,3 +411,23 @@ Fraction MatrixOperations::determinant(const Matrix& mat, OperationHistory& hist
     
     return finalDet;
 }
+
+// 计算代数余子式矩阵
+Matrix MatrixOperations::cofactorMatrix(const Matrix& mat) {
+    return mat.cofactorMatrix();
+}
+
+// 计算伴随矩阵
+Matrix MatrixOperations::adjugate(const Matrix& mat) {
+    return mat.adjugate();
+}
+
+// 按行列展开计算行列式（不带历史记录）
+Fraction MatrixOperations::determinantByExpansion(const Matrix& mat) {
+    return mat.determinantByExpansion();
+}
+
+// 按行列展开计算行列式（带历史记录）
+Fraction MatrixOperations::determinantByExpansion(const Matrix& mat, ExpansionHistory& history) {
+    return mat.determinantByExpansion(history);
+}
