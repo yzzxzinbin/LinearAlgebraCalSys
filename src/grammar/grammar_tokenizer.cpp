@@ -135,8 +135,7 @@ Token Tokenizer::nextToken() {
             default: return Token(TokenType::UNKNOWN, std::string(1, c));
         }
     } catch (const std::exception& e) {
-        // 如果在标记化过程中出现异常，返回一个未知标记
-        std::cerr << "标记化错误: " << e.what() << std::endl;
+        LOG_ERROR("标记化错误: " + std::string(e.what()));
         return Token(TokenType::UNKNOWN, "ERROR");
     }
 }

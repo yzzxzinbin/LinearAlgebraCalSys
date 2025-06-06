@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 #include <algorithm>
+#include "../utils/logger.h"
 
 // 定义特殊键码
 const int KEY_ENTER = 13;
@@ -140,6 +141,8 @@ void TuiApp::executeCommand(const std::string& input) {
             return;
         }
         
+        LOG_INFO("执行命令: " + input);
+        
         // 预处理输入，处理特殊情况
         std::string processedInput = input;
         
@@ -148,51 +151,50 @@ void TuiApp::executeCommand(const std::string& input) {
             processedInput.find('(') == std::string::npos &&
             processedInput.back() != ';') {
             processedInput += ';'; // 添加结束符
+            LOG_DEBUG("为命令添加分号: " + processedInput);
         }
         
         // 对于矩阵和向量赋值，确保分号分隔和结束符存在
         if ((processedInput.find('[') != std::string::npos) && 
             processedInput.back() != ';') {
             processedInput += ';';
+            LOG_DEBUG("为矩阵/向量赋值添加分号: " + processedInput);
         }
         
-        // 打印调试信息（可选）
-        Terminal::setCursor(resultRow, 0);
-        Terminal::setForeground(Color::YELLOW);
-        std::cout << "处理后的命令: " << processedInput << std::endl;
-        Terminal::resetColor();
-        
         // 标记化输入
+        LOG_DEBUG("开始标记化输入");
         Tokenizer tokenizer(processedInput);
         std::vector<Token> tokens = tokenizer.tokenize();
         
-        // 打印标记信息（可选，用于调试）
-        /*
-        Terminal::setCursor(resultRow + 1, 0);
-        Terminal::setForeground(Color::YELLOW);
-        std::cout << "标记数量: " << tokens.size() << std::endl;
+        LOG_DEBUG("标记数量: " + std::to_string(tokens.size()));
         for (size_t i = 0; i < tokens.size(); ++i) {
-            std::cout << "标记 " << i << ": 类型=" << static_cast<int>(tokens[i].type) 
-                      << ", 值=" << tokens[i].value << std::endl;
+            LOG_DEBUG("标记 " + std::to_string(i) + ": 类型=" + 
+                      std::to_string(static_cast<int>(tokens[i].type)) + 
+                      ", 值=\"" + tokens[i].value + "\"");
         }
-        Terminal::resetColor();
-        */
         
         // 确保至少有一个有效标记
         if (tokens.empty() || (tokens.size() == 1 && tokens[0].type == TokenType::END_OF_INPUT)) {
+            LOG_WARNING("输入没有有效标记");
             return; // 空输入，不做任何处理
         }
         
         // 解析标记
+        LOG_DEBUG("开始解析标记");
         Parser parser(tokens);
         std::unique_ptr<AstNode> ast = parser.parse();
         
         if (!ast) {
+            LOG_ERROR("解析失败，无法创建语法树");
             throw std::runtime_error("解析失败，无法创建语法树");
         }
         
+        LOG_DEBUG("语法树创建成功，类型: " + std::to_string(static_cast<int>(ast->type)));
+        
         // 执行语法树
+        LOG_DEBUG("开始执行语法树");
         Variable result = interpreter.execute(ast);
+        LOG_INFO("命令执行完成，结果类型: " + std::to_string(static_cast<int>(result.type)));
         
         // 显示结果
         Terminal::setCursor(resultRow, 0);
@@ -243,14 +245,17 @@ void TuiApp::executeCommand(const std::string& input) {
         // 更新状态消息
         statusMessage = "格式错误: " + std::string(e.what());
     } catch (const std::exception& e) {
-        // 显示错误消息
+        LOG_ERROR("命令执行失败: " + std::string(e.what()));
+        
+        // 显示用户友好的错误消息
         Terminal::setCursor(resultRow, 0);
         Terminal::setForeground(Color::RED);
         std::cout << "错误: " << e.what() << std::endl;
+        std::cout << "请检查日志文件以获取详细信息。" << std::endl;
         Terminal::resetColor();
         
         // 更新状态消息
-        statusMessage = "命令执行失败: " + std::string(e.what());
+        statusMessage = "命令执行失败: 请查看日志文件";
     } catch (...) {
         // 捕获所有其他未知异常
         Terminal::setCursor(resultRow, 0);

@@ -3,6 +3,7 @@
 #include <memory>
 #include <unordered_map>
 #include "grammar_token.h"
+#include "../utils/logger.h"
 
 // 抽象语法树节点类型
 enum class AstNodeType {

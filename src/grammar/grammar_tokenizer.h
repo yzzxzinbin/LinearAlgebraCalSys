@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include "grammar_token.h"
+#include "../utils/logger.h"
 
 class Tokenizer {
 private:
