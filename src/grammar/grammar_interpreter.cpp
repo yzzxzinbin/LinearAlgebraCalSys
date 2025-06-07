@@ -36,7 +36,11 @@ Variable Interpreter::execute(const std::unique_ptr<AstNode>& node) {
 }
 
 void Interpreter::executeCommand(const std::string& command, const std::vector<std::string>& args) {
-    if (command == "help") {
+    std::string commandLower = command;
+    std::transform(commandLower.begin(), commandLower.end(), commandLower.begin(),
+                   [](unsigned char c){ return std::tolower(c); });
+
+    if (commandLower == "help") {
         std::cout << "帮助信息：\n";
         std::cout << "  help             - 显示此帮助信息\n";
         std::cout << "  clear            - 清屏\n";
@@ -67,9 +71,9 @@ void Interpreter::executeCommand(const std::string& command, const std::vector<s
         std::cout << "  m2 = rref(m1)             - 最简行阶梯形\n";
         std::cout << "  m2 = cofactor_matrix(m1)  - 计算代数余子式矩阵\n";
         std::cout << "  m2 = adjugate(m1)         - 计算伴随矩阵\n";
-    } else if (command == "clear") {
+    } else if (commandLower == "clear") {
         // 清屏命令在应用程序中处理
-    } else if (command == "vars") {
+    } else if (commandLower == "vars") {
         if (variables.empty()) {
             std::cout << "没有已定义的变量。\n";
             return;
@@ -94,20 +98,33 @@ void Interpreter::executeCommand(const std::string& command, const std::vector<s
             
             std::cout << "\n";
         }
-    } else if (command == "exit") {
+    } else if (commandLower == "exit") {
         // 退出命令在应用程序中处理
-    } else if (command == "steps") {
+    } else if (commandLower == "steps") {
         showSteps = !showSteps;
         // 注意：此处的 std::cout 输出不会直接显示在 TUI 的结果区域。
         // TuiApp 将根据 showSteps 的状态更新其状态栏。
         // 保留此处的 std::cout 可能用于非 TUI 环境或调试。
         std::cout << "计算步骤显示: " << (showSteps ? "开启" : "关闭") << "\n";
+    } else if (commandLower == "new" || commandLower == "edit") {
+        // "new" 和 "edit" 命令由 TuiApp 直接处理以进入特定模式
+        // Interpreter 层面不需要特别操作，TuiApp::executeCommand 会捕获这些
+        // 并调用相应的 TuiApp 方法进入编辑模式。
+        // 这里可以留空，或者如果 TuiApp 需要 Interpreter 协助准备数据，
+        // 可以在这里添加逻辑，但目前设计为 TuiApp 主导。
+        // 例如，TuiApp::executeCommand 会检查这些命令，
+        // 然后调用 TuiApp::enterMatrixEditMode(...)
     } else {
         throw std::runtime_error("未知命令: " + command);
     }
 }
 
 const std::unordered_map<std::string, Variable>& Interpreter::getVariables() const {
+    return variables;
+}
+
+// 新增：实现 getVariablesNonConst
+std::unordered_map<std::string, Variable>& Interpreter::getVariablesNonConst() {
     return variables;
 }
 

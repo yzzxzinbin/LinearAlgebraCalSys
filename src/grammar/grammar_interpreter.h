@@ -51,8 +51,11 @@ public:
     // 执行命令
     void executeCommand(const std::string& command, const std::vector<std::string>& args);
     
-    // 获取所有变量
+    // 获取所有变量 (const 版本)
     const std::unordered_map<std::string, Variable>& getVariables() const;
+    
+    // 新增：获取所有变量 (non-const 版本，用于修改)
+    std::unordered_map<std::string, Variable>& getVariablesNonConst();
     
     // 设置是否显示步骤
     void setShowSteps(bool show);
