@@ -22,6 +22,7 @@ private:
     int inputRow;
     int resultRow; // 表示结果区域下一可用行
     size_t cursorPosition; // 新增：跟踪光标在currentInput中的位置
+    int stepDisplayStartRow; // 新增: 步骤显示开始的行
     
     // 命令和历史记录
     std::string currentInput;

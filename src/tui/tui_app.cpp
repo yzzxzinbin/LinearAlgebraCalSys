@@ -17,7 +17,8 @@ TuiApp::TuiApp()
     : historyIndex(0), running(true), 
       inStepDisplayMode(false), currentStep(0), totalSteps(0), isExpansionHistory(false),
       cursorPosition(0), // 初始化光标位置
-      inMatrixEditMode(false), editCursorRow(0), editCursorCol(0), cellInputActive(false) // 初始化矩阵编辑模式状态
+      inMatrixEditMode(false), editCursorRow(0), editCursorCol(0), cellInputActive(false), // 初始化矩阵编辑模式状态
+      stepDisplayStartRow(0) // 初始化步骤显示起始行
 {
     // 初始化终端以支持ANSI转义序列
     if (!Terminal::init())
@@ -251,10 +252,25 @@ void TuiApp::handleInput()
 }
 
 void TuiApp::printToResultView(const std::string& text, Color color) {
-    // 在结果区域显示文本
-    Terminal::setCursor(resultRow++, 0);
     Terminal::setForeground(color);
-    std::cout << text << std::endl;
+    std::istringstream iss(text);
+    std::string line;
+    bool firstLine = true;
+    while (std::getline(iss, line)) {
+        Terminal::setCursor(resultRow, 0); // 设置光标到当前 resultRow
+        // 如果text以换行符开头（例如矩阵的variableToString），第一行可能是空的
+        // 或者如果text不以换行符开头，则直接打印
+        // 为了处理 "= \nmatrix"，我们希望 "=" 和 "matrix" 在不同行且 resultRow 正确增加
+        
+        // 如果是 "= \nmatrix_content" 这样的情况，第一行 getline 会得到 "= "
+        // 第二行 getline 会得到 "matrix_content"
+        // std::cout << line << std::endl; 会在每行后加换行
+        std::cout << line;
+        // 如果 iss 还有内容或者这不是原始text的最后一行（通过查看iss状态或line是否为空判断不完美）
+        // 简单起见，每调用getline得到的line都输出后换行并增加resultRow
+        std::cout << std::endl; 
+        resultRow++;
+    }
     Terminal::resetColor();
 }
 
@@ -287,15 +303,15 @@ void TuiApp::executeCommand(const std::string &input)
 
         LOG_INFO("执行命令: " + input);
 
-        // 每次执行命令前先清除结果区域
-        clearResultArea();
+        // 1. 每次执行命令前先清除结果区域
+        clearResultArea(); // 这会将 resultRow 设置为 RESULT_AREA_CONTENT_START_ROW
 
-        // 总是先显示命令输入
-        Terminal::setCursor(resultRow, 0); // resultRow 由 clearResultArea 设置
+        // 2. 总是先显示命令输入 (有且仅有这一次)
+        Terminal::setCursor(resultRow, 0); 
         Terminal::setForeground(Color::GREEN);
         std::cout << "> " << input << std::endl;
         Terminal::resetColor();
-        resultRow++; // 更新下一行位置
+        resultRow++; // 更新下一行位置，为结果或步骤显示做准备
 
         // 预处理输入，处理特殊情况
         std::string processedInput = input;
@@ -364,7 +380,7 @@ void TuiApp::executeCommand(const std::string &input)
             {
                 varName.pop_back();
             }
-
+            // showVariable 内部使用 resultRow，它现在是命令之后的那一行
             showVariable(varName);
             return;
         }
@@ -372,6 +388,7 @@ void TuiApp::executeCommand(const std::string &input)
         // 处理help命令
         if (processedInput == "help" || processedInput == "help;")
         {
+            // showHelp 内部使用 resultRow
             showHelp();
             return;
         }
@@ -388,6 +405,7 @@ void TuiApp::executeCommand(const std::string &input)
         // 处理vars命令
         if (processedInput == "vars" || processedInput == "vars;")
         {
+            // showVariables 内部使用 resultRow
             showVariables();
             return;
         }
@@ -452,36 +470,28 @@ void TuiApp::executeCommand(const std::string &input)
         // 从 Interpreter 执行 AST
         Variable result = interpreter.execute(ast);
         LOG_INFO("命令执行完成，结果类型: " + std::to_string(static_cast<int>(result.type)));
-
-        // 显示结果（这部分可能需要调整，因为步骤显示模式也会清屏）
-        // 如果进入步骤模式，这些输出会被覆盖，但如果没进入，则需要它们
-        // 考虑在不进入步骤模式时才显示这些
         
         bool enteredStepMode = false;
         if (interpreter.isShowingSteps()) {
             const auto& opHistory = interpreter.getCurrentOpHistory();
             if (opHistory.size() > 0) {
                 LOG_INFO("进入步骤展示模式 (OperationHistory), 步骤数: " + std::to_string(opHistory.size()));
-                // 清除结果区域并显示最终结果，然后进入步骤模式
-                clearResultArea();
-                printToResultView("> " + input, Color::GREEN);
-                if (ast->type != AstNodeType::COMMAND) { // 只为非命令显示结果
+                // 命令已打印。如果是非命令节点，打印其最终结果。
+                if (ast->type != AstNodeType::COMMAND) { 
                     printToResultView("= " + variableToString(result), Color::CYAN);
                 }
-                enterStepDisplayMode(opHistory);
+                enterStepDisplayMode(opHistory); // enterStepDisplayMode 会使用当前的 resultRow
                 enteredStepMode = true;
             }
 
-            if (!enteredStepMode) { // 避免重复进入或检查 ExpansionHistory 如果 OperationHistory 已处理
+            if (!enteredStepMode) { 
                 const auto& expHistory = interpreter.getCurrentExpHistory();
                 if (expHistory.size() > 0) {
                     LOG_INFO("进入步骤展示模式 (ExpansionHistory), 步骤数: " + std::to_string(expHistory.size()));
-                    clearResultArea();
-                    printToResultView("> " + input, Color::GREEN);
-                     if (ast->type != AstNodeType::COMMAND) {
-                        printToResultView("= " + variableToString(result), Color::CYAN);
+                    if (ast->type != AstNodeType::COMMAND) {
+                       printToResultView("= " + variableToString(result), Color::CYAN);
                     }
-                    enterStepDisplayMode(expHistory);
+                    enterStepDisplayMode(expHistory); // enterStepDisplayMode 会使用当前的 resultRow
                     enteredStepMode = true;
                 }
             }
@@ -489,28 +499,9 @@ void TuiApp::executeCommand(const std::string &input)
 
         if (!enteredStepMode) {
             // 如果没有进入步骤模式，正常显示结果
-            Terminal::setCursor(resultRow, 0); // 确保光标在正确位置
-            Terminal::setForeground(Color::GREEN);
-            std::cout << "> " << input << std::endl;
-            Terminal::resetColor();
-
+            // 命令已在开头打印。现在只需打印结果。
             if (ast->type != AstNodeType::COMMAND) { // 只为非命令显示结果
-                Terminal::setForeground(Color::CYAN);
-                switch (result.type) {
-                    case VariableType::FRACTION:
-                        std::cout << "= " << result.fractionValue << std::endl;
-                        break;
-                    case VariableType::VECTOR:
-                        std::cout << "= ";
-                        result.vectorValue.print();
-                        std::cout << std::endl;
-                        break;
-                    case VariableType::MATRIX:
-                        std::cout << "= " << std::endl;
-                        result.matrixValue.print();
-                        break;
-                }
-                Terminal::resetColor();
+                printToResultView("= " + variableToString(result), Color::CYAN);
             }
         }
         
@@ -586,46 +577,114 @@ void TuiApp::executeCommand(const std::string &input)
 
 void TuiApp::showHelp()
 {
-    // 从当前光标位置开始显示，而不是重新设置位置
-    // resultRow + 1 是因为我们已经显示了命令行
-    Terminal::setCursor(resultRow + 1, 0);
+    // resultRow 当前指向命令行的下一行
+    Terminal::setCursor(resultRow, 0); // 从 resultRow 开始打印帮助信息
     Terminal::setForeground(Color::CYAN);
-    std::cout << "帮助信息：\n";
+    std::cout << "帮助信息：\n"; // 示例：这会占用 resultRow
+    resultRow++;                 // 更新 resultRow
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  help             - 显示此帮助信息\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  clear            - 清屏\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  vars             - 显示所有变量\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  show <变量名>     - 显示特定变量的值\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  exit             - 退出程序\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  steps            - 切换计算步骤显示\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  new <行数> <列数> - 创建一个新的矩阵变量 (例如: new 2 3)\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  edit <变量名>    - 编辑已存在的矩阵或向量变量\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "变量定义:\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  m1 = [1,2,3;4,5,6] - 定义矩阵\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  v1 = [1,2,3]       - 定义向量\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  f1 = 3/4           - 定义分数\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "基本运算:\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  矩阵: m3 = m1 + m2, m3 = m1 - m2, m3 = m1 * m2 (矩阵乘法)\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "        m1 = m2 * f1 (数乘), m1 = f1 * m2 (数乘)\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  向量: v3 = v1 + v2, v3 = v1 - v2\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "        f_dot = v1 * v2    - 向量点积 (返回分数)\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "        v_cross = v1 x v2  - 向量叉积 (返回向量, 仅3D)\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "        v1 = v2 * f1 (数乘), v1 = f1 * v2 (数乘)\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  分数: f3 = f1 + f2, f3 = f1 - f2, f3 = f1 * f2, f3 = f1 / f2\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "矩阵函数:\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  m2 = transpose(m1)        - 矩阵转置\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  m2 = inverse(m1)          - 计算逆矩阵(伴随矩阵法)\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  m2 = inverse_gauss(m1)    - 计算逆矩阵(高斯-若尔当法)\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  f1 = det(m1)              - 计算行列式(默认方法)\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  f1 = det_expansion(m1)    - 按行列展开计算行列式\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  f1 = rank(m1)             - 计算矩阵秩\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  m2 = ref(m1)              - 行阶梯形\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  m2 = rref(m1)             - 最简行阶梯形\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  m2 = cofactor_matrix(m1)  - 计算代数余子式矩阵\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
     std::cout << "  m2 = adjugate(m1)         - 计算伴随矩阵\n";
-    std::cout << "\n";
+    // resultRow++; // 最后一行不需要再递增，除非后面还有输出
+    std::cout << "\n"; // 确保最后有换行
     Terminal::resetColor();
 
     // 更新状态消息
@@ -634,9 +693,8 @@ void TuiApp::showHelp()
 
 void TuiApp::showVariables()
 {
-    // 从当前光标位置开始显示，而不是重新设置位置
-    // resultRow + 1 是因为我们已经显示了命令行
-    Terminal::setCursor(resultRow + 1, 0);
+    // resultRow 当前指向命令行的下一行
+    Terminal::setCursor(resultRow, 0);
     const auto &vars = interpreter.getVariables();
 
     if (vars.empty())
@@ -644,35 +702,53 @@ void TuiApp::showVariables()
         Terminal::setForeground(Color::YELLOW);
         std::cout << "没有已定义的变量。\n";
         Terminal::resetColor();
+        resultRow++;
         return;
     }
 
     Terminal::setForeground(Color::CYAN);
     std::cout << "已定义的变量：\n";
+    resultRow++;
 
     for (const auto &pair : vars)
     {
+        Terminal::setCursor(resultRow, 0);
         std::cout << "  " << pair.first << " = ";
 
         switch (pair.second.type)
         {
         case VariableType::FRACTION:
             std::cout << pair.second.fractionValue << "\n";
+            resultRow++;
             break;
         case VariableType::VECTOR:
             pair.second.vectorValue.print();
             std::cout << "\n";
+            resultRow++;
             break;
         case VariableType::MATRIX:
-            std::cout << "\n";
-            pair.second.matrixValue.print();
+            std::cout << "\n"; // 为 "m = " 和矩阵内容之间提供一行间隔
+            resultRow++; 
+            Terminal::setCursor(resultRow, 0); // 确保矩阵从新行开始
+            // 假设 matrixValue.print() 会自行处理多行打印，并返回打印的行数或我们手动计算
+            // 为简化，我们让 matrixValue.print() 直接打印，并手动增加 resultRow
+            // 或者，更好的方式是 matrixValue.print() 接受一个起始行参数
+            {
+                std::stringstream matrix_ss;
+                pair.second.matrixValue.print(matrix_ss);
+                std::string matrix_str = matrix_ss.str();
+                std::istringstream matrix_iss(matrix_str);
+                std::string matrix_line;
+                while(std::getline(matrix_iss, matrix_line)) {
+                    Terminal::setCursor(resultRow, 0);
+                    std::cout << "  " << matrix_line << "\n"; // 添加缩进
+                    resultRow++;
+                }
+            }
             break;
         }
     }
-
     Terminal::resetColor();
-
-    // 更新状态消息
     statusMessage = "已显示变量列表";
 }
 
@@ -839,16 +915,15 @@ void TuiApp::showVariable(const std::string &varName)
     const auto &vars = interpreter.getVariables();
     auto it = vars.find(varName);
 
-    // resultRow + 1 是因为我们已经显示了命令行
-    Terminal::setCursor(resultRow + 1, 0);
+    // resultRow 当前指向命令行的下一行
+    Terminal::setCursor(resultRow, 0);
 
     if (it == vars.end())
     {
         Terminal::setForeground(Color::RED);
         std::cout << "错误: 变量 '" << varName << "' 未定义。" << std::endl;
         Terminal::resetColor();
-
-        // 更新状态消息
+        resultRow++;
         statusMessage = "变量未找到: " + varName;
         return;
     }
@@ -860,20 +935,34 @@ void TuiApp::showVariable(const std::string &varName)
     {
     case VariableType::FRACTION:
         std::cout << it->second.fractionValue << std::endl;
+        resultRow++;
         break;
     case VariableType::VECTOR:
-        std::cout << std::endl;
-        it->second.vectorValue.print();
+        // std::cout << std::endl; // Vector.print() 通常不带前导换行
+        // resultRow++;
+        it->second.vectorValue.print(); // 假设 print() 打印在一行
+        std::cout << std::endl; // 确保换行
+        resultRow++;
         break;
     case VariableType::MATRIX:
-        std::cout << std::endl;
-        it->second.matrixValue.print();
+        std::cout << std::endl; // 为 "m = " 和矩阵内容之间提供一行间隔
+        resultRow++;
+        // 与 showVariables 类似地处理矩阵打印
+        {
+            std::stringstream matrix_ss;
+            it->second.matrixValue.print(matrix_ss);
+            std::string matrix_str = matrix_ss.str();
+            std::istringstream matrix_iss(matrix_str);
+            std::string matrix_line;
+            while(std::getline(matrix_iss, matrix_line)) {
+                Terminal::setCursor(resultRow, 0);
+                std::cout << matrix_line << std::endl;
+                resultRow++;
+            }
+        }
         break;
     }
-
     Terminal::resetColor();
-
-    // 更新状态消息
     statusMessage = "显示变量: " + varName;
 }
 
@@ -891,12 +980,13 @@ void TuiApp::enterStepDisplayMode(const OperationHistory& history) {
     currentHistory = history;
     isExpansionHistory = false;
     
-    // 清屏并显示第一步
-    clearResultArea();
+    // resultRow 此时指向命令和最终结果（如果有）之后的下一可用行
+    this->stepDisplayStartRow = this->resultRow;
+    
+    // displayCurrentStep 会从 stepDisplayStartRow 开始绘制
     displayCurrentStep();
     drawStepProgressBar();
     
-    // 更新状态消息
     statusMessage = "步骤导航模式: 使用←→箭头浏览步骤, ESC退出";
     drawStatusBar();
 }
@@ -910,13 +1000,12 @@ void TuiApp::enterStepDisplayMode(const ExpansionHistory& history) {
     totalSteps = history.size();
     currentExpHistory = history;
     isExpansionHistory = true;
-    
-    // 清屏并显示第一步
-    clearResultArea();
+
+    this->stepDisplayStartRow = this->resultRow;
+        
     displayCurrentStep();
     drawStepProgressBar();
     
-    // 更新状态消息
     statusMessage = "步骤导航模式: 使用←→箭头浏览步骤, ESC退出";
     drawStatusBar();
 }
@@ -1225,33 +1314,51 @@ void TuiApp::handleMatrixEditInput(int key) {
     }
 }
 
-// ... (step display mode functions remain unchanged) ...
-
 // 显示当前步骤
 void TuiApp::displayCurrentStep() {
-    // 清除旧的步骤内容区域 (在 "步骤 X / Y:" 行之下)
-    for (int i = RESULT_AREA_TITLE_ROW + 2; i < inputRow; i++) { // 从 "步骤 X/Y:" 下一行开始清除
+    // 清除旧的步骤内容区域 (从 stepDisplayStartRow 开始，直到进度条之前)
+    // 进度条在 inputRow - 2, 进度条上的数字在 inputRow - 3
+    // 所以步骤内容区域最多到 inputRow - 4
+    int endClearRow = inputRow - 1; // 默认清除到输入行前一行
+    if (totalSteps > 0) { // 如果有步骤，则有进度条
+        endClearRow = inputRow - 3; // 清除到进度条数字的上一行
+    }
+    if (endClearRow < stepDisplayStartRow) endClearRow = stepDisplayStartRow; // 防止负范围
+
+    for (int i = stepDisplayStartRow; i < endClearRow; i++) {
         Terminal::setCursor(i, 0);
         std::string spaces(terminalCols, ' ');
         std::cout << spaces;
     }
     
-    // 在结果区域固定位置显示当前步骤信息 ("步骤 X / Y:")
-    Terminal::setCursor(RESULT_AREA_TITLE_ROW + 1, 0); // 例如，行 3
+    // 在 stepDisplayStartRow 显示当前步骤信息 ("步骤 X / Y:")
+    Terminal::setCursor(stepDisplayStartRow, 0);
     Terminal::setForeground(Color::YELLOW);
     std::cout << "步骤 " << (currentStep + 1) << " / " << totalSteps << ":" << std::endl;
     Terminal::resetColor();
     
-    // 根据历史类型在固定位置显示步骤内容
-    // 例如，在 "步骤 X / Y:" 之后空一行开始打印，即行 RESULT_AREA_TITLE_ROW + 3
-    Terminal::setCursor(RESULT_AREA_TITLE_ROW + 3, 0); // 例如，行 5
-    Terminal::setForeground(Color::CYAN);
-    if (isExpansionHistory) {
-        currentExpHistory.getStep(currentStep).print(std::cout);
-    } else {
-        currentHistory.getStep(currentStep).print(std::cout);
+    // 在下一行 (stepDisplayStartRow + 1) 开始显示步骤内容
+    // 确保有足够的空间显示步骤内容
+    if (stepDisplayStartRow + 1 < endClearRow) {
+        Terminal::setCursor(stepDisplayStartRow + 1, 0); 
+        Terminal::setForeground(Color::CYAN);
+        // 捕获步骤打印的输出，以便正确更新光标和处理多行
+        std::stringstream step_ss;
+        if (isExpansionHistory) {
+            currentExpHistory.getStep(currentStep).print(step_ss);
+        } else {
+            currentHistory.getStep(currentStep).print(step_ss);
+        }
+        
+        std::string step_line;
+        int current_print_row = stepDisplayStartRow + 1;
+        std::istringstream step_iss(step_ss.str());
+        while(std::getline(step_iss, step_line) && current_print_row < endClearRow) {
+            Terminal::setCursor(current_print_row++, 0);
+            std::cout << step_line << std::endl;
+        }
+        Terminal::resetColor();
     }
-    Terminal::resetColor();
 }
 
 // 绘制步骤进度条
