@@ -499,7 +499,7 @@ void TuiApp::showHelp()
     std::cout << "  vars             - 显示所有变量\n";
     std::cout << "  show <变量名>     - 显示特定变量的值\n";
     std::cout << "  exit             - 退出程序\n";
-    std::cout << "  steps            - 显示计算步骤\n";
+    std::cout << "  steps            - 切换计算步骤显示\n";
     std::cout << "\n";
     std::cout << "变量定义:\n";
     std::cout << "  m1 = [1,2,3;4,5,6] - 定义矩阵\n";
@@ -507,22 +507,31 @@ void TuiApp::showHelp()
     std::cout << "  f1 = 3/4           - 定义分数\n";
     std::cout << "\n";
     std::cout << "基本运算:\n";
-    std::cout << "  m3 = m1 + m2       - 矩阵加法\n";
-    std::cout << "  m3 = m1 * m2       - 矩阵乘法\n";
-    std::cout << "  v3 = v1 + v2       - 向量加法\n";
-    std::cout << "  f3 = f1 * f2       - 分数乘法\n";
+    std::cout << "  矩阵: m3 = m1 + m2, m3 = m1 - m2, m3 = m1 * m2 (矩阵乘法)\n";
+    std::cout << "        m1 = m2 * f1 (数乘), m1 = f1 * m2 (数乘)\n";
+    std::cout << "  向量: v3 = v1 + v2, v3 = v1 - v2\n";
+    std::cout << "        f_dot = v1 * v2    - 向量点积 (返回分数)\n";
+    std::cout << "        v_cross = v1 x v2  - 向量叉积 (返回向量, 仅3D)\n";
+    std::cout << "        v1 = v2 * f1 (数乘), v1 = f1 * v2 (数乘)\n";
+    std::cout << "  分数: f3 = f1 + f2, f3 = f1 - f2, f3 = f1 * f2, f3 = f1 / f2\n";
     std::cout << "\n";
     std::cout << "矩阵函数:\n";
     std::cout << "  m2 = transpose(m1)        - 矩阵转置\n";
     std::cout << "  m2 = inverse(m1)          - 计算逆矩阵(伴随矩阵法)\n";
     std::cout << "  m2 = inverse_gauss(m1)    - 计算逆矩阵(高斯-若尔当法)\n";
-    std::cout << "  f1 = det(m1)              - 计算行列式\n";
+    std::cout << "  f1 = det(m1)              - 计算行列式(默认方法)\n";
     std::cout << "  f1 = det_expansion(m1)    - 按行列展开计算行列式\n";
     std::cout << "  f1 = rank(m1)             - 计算矩阵秩\n";
     std::cout << "  m2 = ref(m1)              - 行阶梯形\n";
     std::cout << "  m2 = rref(m1)             - 最简行阶梯形\n";
     std::cout << "  m2 = cofactor_matrix(m1)  - 计算代数余子式矩阵\n";
     std::cout << "  m2 = adjugate(m1)         - 计算伴随矩阵\n";
+    std::cout << "\n";
+    std::cout << "向量函数:\n";
+    std::cout << "  f1 = dot(v1, v2)          - 计算向量点积 (同 v1 * v2)\n";
+    std::cout << "  v3 = cross(v1, v2)        - 计算向量叉积 (同 v1 x v2, 仅3D)\n";
+    std::cout << "  f1 = norm(v1)             - 计算向量的模长的平方\n";
+    std::cout << "  v1 = normalize(v1)        - 向量归一化(返回 v / (norm(v)) )\n";
     Terminal::resetColor();
 
     // 更新状态消息

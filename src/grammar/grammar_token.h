@@ -15,6 +15,7 @@ enum class TokenType {
     MINUS,          // -
     MULTIPLY,       // *
     DIVIDE,         // /
+    CROSS_PRODUCT,  // x (用于向量叉乘)
     ASSIGN,         // =
     
     // 分隔符

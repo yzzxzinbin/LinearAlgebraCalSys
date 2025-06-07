@@ -106,9 +106,23 @@ Token Tokenizer::nextToken() {
             return Token(TokenType::END_OF_INPUT, "");
         }
         
-        char c = advance();
+        char c_peek = peek(); // 先查看当前字符
+
+        // 特殊处理 'x' 作为可能的 CROSS_PRODUCT
+        if (c_peek == 'x') {
+            // 查看 'x' 后面的字符，判断 'x' 是否独立
+            // 如果 'x' 是最后一个字符，或者其后不是字母数字或下划线，则为 CROSS_PRODUCT
+            if (position + 1 >= input.length() || (!std::isalnum(input[position + 1]) && input[position + 1] != '_')) {
+                advance(); // 消耗 'x'
+                return Token(TokenType::CROSS_PRODUCT, "x");
+            }
+            // 如果 'x' 后面是字母数字或下划线，则它是标识符的一部分
+            // 交给下面的通用标识符逻辑处理
+        }
         
-        // 处理标识符
+        char c = advance(); // 消耗字符 (对于其他情况，或者 'x' 是标识符一部分的情况)
+        
+        // 处理标识符 (如果 'x' 是标识符的一部分，这里会正确处理)
         if (std::isalpha(c) || c == '_') {
             position--; // 回退，以便identifier()可以从开头开始处理
             return identifier();

@@ -121,7 +121,7 @@ std::unique_ptr<AstNode> Parser::term() {
 std::unique_ptr<AstNode> Parser::factor() {
     auto expr = primary();
     
-    while (match(TokenType::MULTIPLY) || match(TokenType::DIVIDE)) {
+    while (match(TokenType::MULTIPLY) || match(TokenType::DIVIDE) || match(TokenType::CROSS_PRODUCT)) { // 添加对 CROSS_PRODUCT 的匹配
         TokenType op = previous().type;
         auto right = primary();
         expr = std::make_unique<BinaryOpNode>(op, std::move(expr), std::move(right));

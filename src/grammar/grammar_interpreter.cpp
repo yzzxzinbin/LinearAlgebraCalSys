@@ -157,6 +157,12 @@ Variable Interpreter::executeBinaryOp(const BinaryOpNode* node) {
             return multiply(left, right);
         case TokenType::DIVIDE:
             return divide(left, right);
+        case TokenType::CROSS_PRODUCT: // 新增对叉乘的处理
+            if (left.type == VariableType::VECTOR && right.type == VariableType::VECTOR) {
+                return Variable(left.vectorValue.cross(right.vectorValue));
+            } else {
+                throw std::runtime_error("叉乘操作 (x) 仅支持两个向量");
+            }
         default:
             throw std::runtime_error("不支持的二元运算符");
     }
@@ -174,7 +180,7 @@ Variable Interpreter::executeFunctionCall(const FunctionCallNode* node) {
                                           // 暂时，我们假设参数求值不会触发新的历史记录清除，因为它们不是顶层命令。
                                           // 一个更安全的做法是，execute 的重载版本，一个给TuiApp，一个内部用。
                                           // 或者，execute 接受一个 isTopLevel 调用标志。
-                                          // 目前，由于参数通常是变量或字面量，它们不会调用 executeFunctionCall，所以暂时安全。
+                                          // 目前，由于参数通常是变量或字面量，它们不会调用executeFunctionCall，所以暂时安全。
     }
     
     std::string funcNameOriginal = node->name;
@@ -369,8 +375,13 @@ Variable Interpreter::multiply(const Variable& left, const Variable& right) {
     if (left.type == VariableType::MATRIX && right.type == VariableType::MATRIX) {
         return Variable(left.matrixValue * right.matrixValue);
     }
+
+    // 向量 * 向量 (点积)
+    if (left.type == VariableType::VECTOR && right.type == VariableType::VECTOR) {
+        return Variable(left.vectorValue.dot(right.vectorValue)); // 点积返回分数
+    }
     
-    throw std::runtime_error("不支持的乘法操作");
+    throw std::runtime_error("不支持的乘法操作或类型组合");
 }
 
 Variable Interpreter::divide(const Variable& left, const Variable& right) {
