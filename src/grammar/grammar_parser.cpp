@@ -60,26 +60,43 @@ std::unique_ptr<AstNode> Parser::statement() {
         auto node = std::make_unique<CommandNode>(command);
         
         // 安全收集命令参数，直到遇到终止符或者输入结束
-        while (!isAtEnd() && peek().type != TokenType::END_OF_INPUT && 
-               peek().type != TokenType::SEMICOLON) {
-            try {
-                // 确保我们只添加有效的参数
-                if (peek().type == TokenType::IDENTIFIER || 
-                    peek().type == TokenType::INTEGER ||
-                    peek().type == TokenType::FRACTION) {
+        // 对于 export 和 import，我们期望一个文件名参数
+        if (command == "export" || command == "import") {
+            if (!isAtEnd() && peek().type != TokenType::SEMICOLON && peek().type != TokenType::END_OF_INPUT) {
+                 // 允许文件名包含点，但不作为单独的 IDENTIFIER 类型处理，而是作为字符串值
+                 // 这里假设文件名是一个单独的词元，可以是 IDENTIFIER 或一个被特殊处理的 STRING 类型（如果未来支持）
+                 // 目前，如果文件名是 "file.txt"，它会被词法分析器分为 "file", ".", "txt"
+                 // 为了简单起见，我们先假设文件名是一个不含空格的简单字符串，作为单个参数
+                 // 或者，更好的做法是，词法分析器能识别带引号的字符串作为单个 TOKEN
+                 // 暂时，我们只取下一个 IDENTIFIER 作为文件名
+                if (peek().type == TokenType::IDENTIFIER) {
                     node->arguments.push_back(advance().value);
-                } else {
-                    // 如果不是有效参数类型，跳过
-                    advance();
+                } else if (peek().type == TokenType::UNKNOWN && !peek().value.empty() && peek().value.find('.') != std::string::npos) {
+                    // 尝试处理像 file.txt 这样的情况，如果 UNKNOWN 包含点
+                    // 这是一种 hack，理想情况下词法分析器应更好处理
+                    node->arguments.push_back(advance().value);
                 }
-            } catch (const std::exception& e) {
-                // 如果处理参数时出错，停止收集参数
-                std::cerr << "参数处理错误: " << e.what() << std::endl;
-                break;
+                // 如果文件名包含特殊字符或空格，当前解析器可能无法正确处理为单个参数
+            }
+        } else {
+            while (!isAtEnd() && peek().type != TokenType::END_OF_INPUT && 
+                   peek().type != TokenType::SEMICOLON) {
+                try {
+                    if (peek().type == TokenType::IDENTIFIER || 
+                        peek().type == TokenType::INTEGER ||
+                        peek().type == TokenType::FRACTION ||
+                        peek().type == TokenType::UNKNOWN) { // 允许 UNKNOWN 作为参数值
+                        node->arguments.push_back(advance().value);
+                    } else {
+                        advance();
+                    }
+                } catch (const std::exception& e) {
+                    std::cerr << "参数处理错误: " << e.what() << std::endl;
+                    break;
+                }
             }
         }
         
-        // 如果有分号结束符，消费它
         match(TokenType::SEMICOLON);
         
         return node;

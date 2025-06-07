@@ -9,9 +9,11 @@ static const std::unordered_map<std::string, bool> keywords = {
     {"vars", true},
     {"exit", true},
     {"steps", true},
-    {"show", true},  // 添加新的关键字
-    {"new", true},   // 新增关键字
-    {"edit", true}   // 新增关键字
+    {"show", true},
+    {"new", true},
+    {"edit", true},
+    {"export", true}, // 新增关键字
+    {"import", true}  // 新增关键字
 };
 
 Tokenizer::Tokenizer(const std::string& input) : input(input), position(0) {}

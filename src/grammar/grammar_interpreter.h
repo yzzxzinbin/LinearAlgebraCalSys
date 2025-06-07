@@ -39,8 +39,15 @@ class Interpreter {
 private:
     std::unordered_map<std::string, Variable> variables;
     bool showSteps;
-    OperationHistory currentOpHistory_;      // 新增：存储当前操作历史
-    ExpansionHistory currentExpHistory_; // 新增：存储当前展开历史
+    OperationHistory currentOpHistory_;
+    ExpansionHistory currentExpHistory_;
+
+    // 新增：导出和导入的辅助方法
+    std::string serializeVariable(const std::string& name, const Variable& var) const;
+    std::pair<std::string, Variable> deserializeLine(const std::string& line) const;
+    Fraction parseFractionString(const std::string& s) const;
+    std::vector<std::string> splitString(const std::string& s, char delimiter) const;
+
 
 public:
     Interpreter();
@@ -71,6 +78,10 @@ public:
     
     // 新增：清除当前历史记录
     void clearCurrentHistories();
+
+    // 新增：导出和导入变量的方法
+    std::string exportVariables(const std::string& filename);
+    std::string importVariables(const std::string& filename);
 
 private:
     // 执行各种节点类型
