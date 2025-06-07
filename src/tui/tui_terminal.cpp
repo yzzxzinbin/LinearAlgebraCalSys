@@ -4,7 +4,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#include <conio.h>
+#include <conio.h> // For _getch, _kbhit
 #else
 #include <sys/ioctl.h>
 #include <termios.h>
@@ -154,11 +154,26 @@ void Terminal::setRawMode(bool enable) {
 // 读取一个字符
 int Terminal::readChar() {
 #ifdef _WIN32
-    return _getch();
+    int c = _getch();
+    if (c == 0 || c == 224) { // 特殊键前缀 (0xE0 等价于 224)
+        int scancode = _getch(); // 读取实际的扫描码
+        switch (scancode) {
+            case 72: return KEY_UP;    // 上箭头
+            case 80: return KEY_DOWN;  // 下箭头
+            case 75: return KEY_LEFT;  // 左箭头
+            case 77: return KEY_RIGHT; // 右箭头
+            // case 83: return KEY_DELETE; // 如果需要映射 Delete 键 (ASCII DEL 是 127, Windows 扫描码是 83)
+            // 可以根据需要添加其他特殊键的映射
+            default: return -1; // 未处理的特殊键，或返回一个组合码 (c << 8) | scancode
+        }
+    }
+    return c; // 普通键
 #else
-    char c;
-    read(STDIN_FILENO, &c, 1);
-    return (int)c;
+    char c_val;
+    if (read(STDIN_FILENO, &c_val, 1) == 1) {
+        return (int)c_val;
+    }
+    return -1; // 读取错误
 #endif
 }
 

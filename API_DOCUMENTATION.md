@@ -97,7 +97,7 @@ Vector operator*(const Fraction& k) const;   // 向量数乘
 Fraction dot(const Vector& rhs) const;       // 向量点乘(内积)
 Vector cross(const Vector& rhs) const;       // 向量叉乘(外积)，仅适用于3D向量
 Fraction norm() const;                       // 计算向量的范数平方
-Vector normalize() const;                    // 向量归一化
+Vector normalize() const;                    // 向量归一化(暂时未实现)
 ```
 
 ## 矩阵类 (Matrix)

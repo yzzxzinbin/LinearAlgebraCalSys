@@ -39,6 +39,8 @@ class Interpreter {
 private:
     std::unordered_map<std::string, Variable> variables;
     bool showSteps;
+    OperationHistory currentOpHistory_;      // 新增：存储当前操作历史
+    ExpansionHistory currentExpHistory_; // 新增：存储当前展开历史
 
 public:
     Interpreter();
@@ -55,6 +57,18 @@ public:
     // 设置是否显示步骤
     void setShowSteps(bool show);
     
+    // 检查是否显示步骤
+    bool isShowingSteps() const;
+    
+    // 新增：获取当前操作历史
+    const OperationHistory& getCurrentOpHistory() const;
+    
+    // 新增：获取当前展开历史
+    const ExpansionHistory& getCurrentExpHistory() const;
+    
+    // 新增：清除当前历史记录
+    void clearCurrentHistories();
+
 private:
     // 执行各种节点类型
     Variable executeVariable(const VariableNode* node);

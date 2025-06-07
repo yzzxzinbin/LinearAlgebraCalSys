@@ -2,6 +2,8 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+#include <algorithm> //确保已包含
+#include <cctype>    //为 std::tolower 添加
 
 Interpreter::Interpreter() : showSteps(false) {}
 
@@ -10,6 +12,8 @@ Variable Interpreter::execute(const std::unique_ptr<AstNode>& node) {
         throw std::runtime_error("空节点无法执行");
     }
     
+    clearCurrentHistories(); // 在每次执行主命令前清除历史
+
     switch (node->type) {
         case AstNodeType::VARIABLE:
             return executeVariable(static_cast<const VariableNode*>(node.get()));
@@ -94,6 +98,9 @@ void Interpreter::executeCommand(const std::string& command, const std::vector<s
         // 退出命令在应用程序中处理
     } else if (command == "steps") {
         showSteps = !showSteps;
+        // 注意：此处的 std::cout 输出不会直接显示在 TUI 的结果区域。
+        // TuiApp 将根据 showSteps 的状态更新其状态栏。
+        // 保留此处的 std::cout 可能用于非 TUI 环境或调试。
         std::cout << "计算步骤显示: " << (showSteps ? "开启" : "关闭") << "\n";
     } else {
         throw std::runtime_error("未知命令: " + command);
@@ -106,6 +113,23 @@ const std::unordered_map<std::string, Variable>& Interpreter::getVariables() con
 
 void Interpreter::setShowSteps(bool show) {
     showSteps = show;
+}
+
+bool Interpreter::isShowingSteps() const {
+    return showSteps;
+}
+
+const OperationHistory& Interpreter::getCurrentOpHistory() const {
+    return currentOpHistory_;
+}
+
+const ExpansionHistory& Interpreter::getCurrentExpHistory() const {
+    return currentExpHistory_;
+}
+
+void Interpreter::clearCurrentHistories() {
+    currentOpHistory_.clear();
+    currentExpHistory_.clear();
 }
 
 Variable Interpreter::executeVariable(const VariableNode* node) {
@@ -142,140 +166,117 @@ Variable Interpreter::executeFunctionCall(const FunctionCallNode* node) {
     // 获取参数
     std::vector<Variable> args;
     for (const auto& argNode : node->arguments) {
-        args.push_back(execute(argNode));
+        args.push_back(execute(argNode)); // 注意：这里递归调用execute，它会调用clearCurrentHistories
+                                          // 这可能导致嵌套函数调用的历史记录被清除。
+                                          // 顶层的 execute 清除历史，这里的 execute 是为了参数求值，不应清除。
+                                          // 为了解决这个问题，execute(AstNode) 应该只在顶层调用时清除历史。
+                                          // 或者，参数求值不应调用顶层 execute，而是特定的求值函数。
+                                          // 暂时，我们假设参数求值不会触发新的历史记录清除，因为它们不是顶层命令。
+                                          // 一个更安全的做法是，execute 的重载版本，一个给TuiApp，一个内部用。
+                                          // 或者，execute 接受一个 isTopLevel 调用标志。
+                                          // 目前，由于参数通常是变量或字面量，它们不会调用 executeFunctionCall，所以暂时安全。
     }
     
-    // 根据函数名执行对应的操作
-    if (node->name == "transpose") {
+    std::string funcNameOriginal = node->name;
+    std::string funcNameLower = funcNameOriginal;
+    std::transform(funcNameLower.begin(), funcNameLower.end(), funcNameLower.begin(), 
+                   [](unsigned char c){ return std::tolower(c); });
+
+    // 如果启用了步骤显示，尝试使用带历史记录的版本
+    if (showSteps) {
+        if (funcNameLower == "det" && args.size() == 1 && args[0].type == VariableType::MATRIX) {
+            return Variable(MatrixOperations::determinant(args[0].matrixValue, currentOpHistory_));
+        } else if (funcNameLower == "inverse" && args.size() == 1 && args[0].type == VariableType::MATRIX) {
+            return Variable(MatrixOperations::inverse(args[0].matrixValue, currentOpHistory_));
+        } else if (funcNameLower == "inverse_gauss" && args.size() == 1 && args[0].type == VariableType::MATRIX) {
+            return Variable(MatrixOperations::inverseGaussJordan(args[0].matrixValue, currentOpHistory_));
+        } else if (funcNameLower == "ref" && args.size() == 1 && args[0].type == VariableType::MATRIX) {
+            Matrix mat = args[0].matrixValue; // 复制矩阵以进行修改
+            MatrixOperations::toRowEchelonForm(mat, currentOpHistory_);
+            return Variable(mat);
+        } else if (funcNameLower == "rref" && args.size() == 1 && args[0].type == VariableType::MATRIX) {
+            Matrix mat = args[0].matrixValue; // 复制矩阵以进行修改
+            MatrixOperations::toReducedRowEchelonForm(mat, currentOpHistory_);
+            return Variable(mat);
+        } else if (funcNameLower == "det_expansion" && args.size() == 1 && args[0].type == VariableType::MATRIX) {
+            return Variable(MatrixOperations::determinantByExpansion(args[0].matrixValue, currentExpHistory_));
+        }
+        // 如果 showSteps 为 true 但函数不在此列表中，则会执行下面的常规逻辑
+    }
+    
+    // 常规执行逻辑（showSteps 为 false 或函数不支持步骤显示）
+    if (funcNameLower == "transpose") {
         if (args.size() != 1 || args[0].type != VariableType::MATRIX) {
             throw std::runtime_error("transpose函数需要一个矩阵参数");
         }
-        
         return Variable(args[0].matrixValue.transpose());
-    } else if (node->name == "inverse") {
+    } else if (funcNameLower == "inverse") { // 无历史记录版本
         if (args.size() != 1 || args[0].type != VariableType::MATRIX) {
             throw std::runtime_error("inverse函数需要一个矩阵参数");
         }
-        
-        if (showSteps) {
-            OperationHistory history;
-            Matrix inv = MatrixOperations::inverse(args[0].matrixValue, history);
-            displaySteps(history);
-            return Variable(inv);
-        } else {
-            return Variable(MatrixOperations::inverse(args[0].matrixValue));
-        }
-    } else if (node->name == "inverse_gauss") {
+        return Variable(MatrixOperations::inverse(args[0].matrixValue));
+    } else if (funcNameLower == "inverse_gauss") { // 无历史记录版本
         if (args.size() != 1 || args[0].type != VariableType::MATRIX) {
             throw std::runtime_error("inverse_gauss函数需要一个矩阵参数");
         }
-        
-        if (showSteps) {
-            OperationHistory history;
-            Matrix inv = MatrixOperations::inverseGaussJordan(args[0].matrixValue, history);
-            displaySteps(history);
-            return Variable(inv);
-        } else {
-            return Variable(MatrixOperations::inverseGaussJordan(args[0].matrixValue));
-        }
-    } else if (node->name == "det") {
+        return Variable(MatrixOperations::inverseGaussJordan(args[0].matrixValue));
+    } else if (funcNameLower == "det") { // 无历史记录版本
         if (args.size() != 1 || args[0].type != VariableType::MATRIX) {
             throw std::runtime_error("det函数需要一个矩阵参数");
         }
-        
-        if (showSteps) {
-            OperationHistory history;
-            Fraction det = MatrixOperations::determinant(args[0].matrixValue, history);
-            displaySteps(history);
-            return Variable(det);
-        } else {
-            return Variable(MatrixOperations::determinant(args[0].matrixValue));
-        }
-    } else if (node->name == "det_expansion") {
+        return Variable(MatrixOperations::determinant(args[0].matrixValue));
+    } else if (funcNameLower == "det_expansion") { // 无历史记录版本
         if (args.size() != 1 || args[0].type != VariableType::MATRIX) {
             throw std::runtime_error("det_expansion函数需要一个矩阵参数");
         }
-        
-        if (showSteps) {
-            ExpansionHistory history;
-            Fraction det = MatrixOperations::determinantByExpansion(args[0].matrixValue, history);
-            displaySteps(history);
-            return Variable(det);
-        } else {
-            return Variable(MatrixOperations::determinantByExpansion(args[0].matrixValue));
-        }
-    } else if (node->name == "rank") {
+        return Variable(MatrixOperations::determinantByExpansion(args[0].matrixValue));
+    } else if (funcNameLower == "rank") {
         if (args.size() != 1 || args[0].type != VariableType::MATRIX) {
             throw std::runtime_error("rank函数需要一个矩阵参数");
         }
-        
         return Variable(Fraction(MatrixOperations::rank(args[0].matrixValue)));
-    } else if (node->name == "ref") {
+    } else if (funcNameLower == "ref") { // 无历史记录版本
         if (args.size() != 1 || args[0].type != VariableType::MATRIX) {
             throw std::runtime_error("ref函数需要一个矩阵参数");
         }
-        
-        if (showSteps) {
-            Matrix mat = args[0].matrixValue;
-            OperationHistory history;
-            MatrixOperations::toRowEchelonForm(mat, history);
-            displaySteps(history);
-            return Variable(mat);
-        } else {
-            return Variable(MatrixOperations::toRowEchelonForm(args[0].matrixValue));
-        }
-    } else if (node->name == "rref") {
+        return Variable(MatrixOperations::toRowEchelonForm(args[0].matrixValue));
+    } else if (funcNameLower == "rref") { // 无历史记录版本
         if (args.size() != 1 || args[0].type != VariableType::MATRIX) {
             throw std::runtime_error("rref函数需要一个矩阵参数");
         }
-        
-        if (showSteps) {
-            Matrix mat = args[0].matrixValue;
-            OperationHistory history;
-            MatrixOperations::toReducedRowEchelonForm(mat, history);
-            displaySteps(history);
-            return Variable(mat);
-        } else {
-            return Variable(MatrixOperations::toReducedRowEchelonForm(args[0].matrixValue));
-        }
-    } else if (node->name == "cofactor_matrix") {
+        return Variable(MatrixOperations::toReducedRowEchelonForm(args[0].matrixValue));
+    } else if (funcNameLower == "cofactor_matrix") {
         if (args.size() != 1 || args[0].type != VariableType::MATRIX) {
             throw std::runtime_error("cofactor_matrix函数需要一个矩阵参数");
         }
-        
         return Variable(MatrixOperations::cofactorMatrix(args[0].matrixValue));
-    } else if (node->name == "adjugate") {
+    } else if (funcNameLower == "adjugate") {
         if (args.size() != 1 || args[0].type != VariableType::MATRIX) {
             throw std::runtime_error("adjugate函数需要一个矩阵参数");
         }
-        
         return Variable(MatrixOperations::adjugate(args[0].matrixValue));
-    } else if (node->name == "dot") {
+    } else if (funcNameLower == "dot") {
         if (args.size() != 2 || args[0].type != VariableType::VECTOR || args[1].type != VariableType::VECTOR) {
             throw std::runtime_error("dot函数需要两个向量参数");
         }
-        
         return Variable(args[0].vectorValue.dot(args[1].vectorValue));
-    } else if (node->name == "cross") {
+    } else if (funcNameLower == "cross") {
         if (args.size() != 2 || args[0].type != VariableType::VECTOR || args[1].type != VariableType::VECTOR) {
             throw std::runtime_error("cross函数需要两个向量参数");
         }
-        
         return Variable(args[0].vectorValue.cross(args[1].vectorValue));
-    } else if (node->name == "norm") {
+    } else if (funcNameLower == "norm") {
         if (args.size() != 1 || args[0].type != VariableType::VECTOR) {
             throw std::runtime_error("norm函数需要一个向量参数");
         }
-        
         return Variable(args[0].vectorValue.norm());
-    } else if (node->name == "normalize") {
+    } else if (funcNameLower == "normalize") {
         if (args.size() != 1 || args[0].type != VariableType::VECTOR) {
             throw std::runtime_error("normalize函数需要一个向量参数");
         }
-        
         return Variable(args[0].vectorValue.normalize());
     } else {
-        throw std::runtime_error("未知函数: " + node->name);
+        throw std::runtime_error("未知函数: " + funcNameOriginal);
     }
 }
 

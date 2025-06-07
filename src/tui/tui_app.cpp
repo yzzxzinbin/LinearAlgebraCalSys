@@ -1,22 +1,20 @@
 #include "tui_app.h"
-#include "tui_terminal.h"
+#include "tui_terminal.h" // KEY_... 常量现在从此头文件获得
 #include <iostream>
 #include <string>
 #include <algorithm>
 #include <windows.h>
 #include "../utils/logger.h"
+#include "../grammar/grammar_tokenizer.h"
+#include "../grammar/grammar_parser.h"
 
-// 定义特殊键码
-const int KEY_ENTER = 13;
-const int KEY_ESCAPE = 27;
-const int KEY_BACKSPACE = 8;
-const int KEY_DELETE = 127;
-const int KEY_UP = 256;
-const int KEY_DOWN = 257;
-const int KEY_LEFT = 258;
-const int KEY_RIGHT = 259;
+// 新增：定义输出区域的布局常量
+const int RESULT_AREA_TITLE_ROW = 2; // "输出区域:" 标题所在的行 (0-indexed)
+const int RESULT_AREA_CONTENT_START_ROW = RESULT_AREA_TITLE_ROW + 1; // 实际内容开始的第一行
 
-TuiApp::TuiApp() : historyIndex(0), running(true)
+TuiApp::TuiApp() 
+    : historyIndex(0), running(true), 
+      inStepDisplayMode(false), currentStep(0), totalSteps(0), isExpansionHistory(false)
 {
     // 初始化终端以支持ANSI转义序列
     if (!Terminal::init())
@@ -30,7 +28,8 @@ TuiApp::TuiApp() : historyIndex(0), running(true)
 
     // 计算UI布局
     inputRow = terminalRows - 2;
-    resultRow = 3;
+    // resultRow 成员变量现在表示内容区的下一行，由 clearResultArea 初始化/重置
+    // this->resultRow = RESULT_AREA_CONTENT_START_ROW; // 将在 initUI -> drawResultArea -> clearResultArea 中设置
 
     // 初始状态消息
     statusMessage = "欢迎使用线性代数计算系统! 输入 'help' 获取帮助。";
@@ -67,7 +66,7 @@ void TuiApp::initUI()
     drawHeader();
     drawInputPrompt();
     drawStatusBar();
-    drawResultArea();
+    drawResultArea(); // 这会调用 clearResultArea，进而设置 this->resultRow
 }
 
 void TuiApp::updateUI()
@@ -93,6 +92,41 @@ void TuiApp::handleInput()
 {
     // 读取一个字符
     int key = Terminal::readChar();
+
+    // 如果处于步骤显示模式，处理导航键
+    if (inStepDisplayMode)
+    {
+        if (key == KEY_ESCAPE)
+        {
+            // ESC键退出步骤导航模式
+            exitStepDisplayMode();
+            return;
+        }
+        else if (key == KEY_LEFT || (key == 27 && Terminal::hasInput() && Terminal::readChar() == '[' && Terminal::readChar() == 'D'))
+        {
+            // 左箭头，显示上一步
+            if (currentStep > 0)
+            {
+                currentStep--;
+                displayCurrentStep();
+                drawStepProgressBar();
+            }
+            return;
+        }
+        else if (key == KEY_RIGHT || (key == 27 && Terminal::hasInput() && Terminal::readChar() == '[' && Terminal::readChar() == 'C'))
+        {
+            // 右箭头，显示下一步
+            if (currentStep < totalSteps - 1)
+            {
+                currentStep++;
+                displayCurrentStep();
+                drawStepProgressBar();
+            }
+            return;
+        }
+        // 在步骤显示模式下忽略其他键
+        return;
+    }
 
     // 处理特殊键
     if (key == KEY_ESCAPE)
@@ -173,6 +207,31 @@ void TuiApp::handleInput()
         currentInput.push_back(static_cast<char>(key));
         drawInputPrompt();
     }
+}
+
+void TuiApp::printToResultView(const std::string& text, Color color) {
+    // 在结果区域显示文本
+    Terminal::setCursor(resultRow++, 0);
+    Terminal::setForeground(color);
+    std::cout << text << std::endl;
+    Terminal::resetColor();
+}
+
+std::string TuiApp::variableToString(const Variable& var) {
+    std::stringstream ss;
+    switch (var.type) {
+        case VariableType::FRACTION:
+            ss << var.fractionValue;
+            break;
+        case VariableType::VECTOR:
+            var.vectorValue.print(ss);
+            break;
+        case VariableType::MATRIX:
+            ss << std::endl;
+            var.matrixValue.print(ss);
+            break;
+    }
+    return ss.str();
 }
 
 void TuiApp::executeCommand(const std::string &input)
@@ -293,41 +352,90 @@ void TuiApp::executeCommand(const std::string &input)
 
         LOG_DEBUG("语法树创建成功，类型: " + std::to_string(static_cast<int>(ast->type)));
 
-        // 执行语法树
-        LOG_DEBUG("开始执行语法树");
+        // 从 Interpreter 执行 AST
         Variable result = interpreter.execute(ast);
         LOG_INFO("命令执行完成，结果类型: " + std::to_string(static_cast<int>(result.type)));
 
-        // 显示结果
-        Terminal::setCursor(resultRow, 0);
-        Terminal::setForeground(Color::GREEN);
-        std::cout << "> " << input << std::endl;
-        Terminal::resetColor();
-
-        // 仅在有意义的结果时显示
-        if (ast->type != AstNodeType::COMMAND)
-        {
-            Terminal::setForeground(Color::CYAN);
-            switch (result.type)
-            {
-            case VariableType::FRACTION:
-                std::cout << "= " << result.fractionValue << std::endl;
-                break;
-            case VariableType::VECTOR:
-                std::cout << "= ";
-                result.vectorValue.print();
-                std::cout << std::endl;
-                break;
-            case VariableType::MATRIX:
-                std::cout << "= " << std::endl;
-                result.matrixValue.print();
-                break;
+        // 显示结果（这部分可能需要调整，因为步骤显示模式也会清屏）
+        // 如果进入步骤模式，这些输出会被覆盖，但如果没进入，则需要它们
+        // 考虑在不进入步骤模式时才显示这些
+        
+        bool enteredStepMode = false;
+        if (interpreter.isShowingSteps()) {
+            const auto& opHistory = interpreter.getCurrentOpHistory();
+            if (opHistory.size() > 0) {
+                LOG_INFO("进入步骤展示模式 (OperationHistory), 步骤数: " + std::to_string(opHistory.size()));
+                // 清除结果区域并显示最终结果，然后进入步骤模式
+                clearResultArea();
+                printToResultView("> " + input, Color::GREEN);
+                if (ast->type != AstNodeType::COMMAND) { // 只为非命令显示结果
+                    printToResultView("= " + variableToString(result), Color::CYAN);
+                }
+                enterStepDisplayMode(opHistory);
+                enteredStepMode = true;
             }
-            Terminal::resetColor();
+
+            if (!enteredStepMode) { // 避免重复进入或检查 ExpansionHistory 如果 OperationHistory 已处理
+                const auto& expHistory = interpreter.getCurrentExpHistory();
+                if (expHistory.size() > 0) {
+                    LOG_INFO("进入步骤展示模式 (ExpansionHistory), 步骤数: " + std::to_string(expHistory.size()));
+                    clearResultArea();
+                    printToResultView("> " + input, Color::GREEN);
+                     if (ast->type != AstNodeType::COMMAND) {
+                        printToResultView("= " + variableToString(result), Color::CYAN);
+                    }
+                    enterStepDisplayMode(expHistory);
+                    enteredStepMode = true;
+                }
+            }
         }
 
+        if (!enteredStepMode) {
+            // 如果没有进入步骤模式，正常显示结果
+            Terminal::setCursor(resultRow, 0); // 确保光标在正确位置
+            Terminal::setForeground(Color::GREEN);
+            std::cout << "> " << input << std::endl;
+            Terminal::resetColor();
+
+            if (ast->type != AstNodeType::COMMAND) { // 只为非命令显示结果
+                Terminal::setForeground(Color::CYAN);
+                switch (result.type) {
+                    case VariableType::FRACTION:
+                        std::cout << "= " << result.fractionValue << std::endl;
+                        break;
+                    case VariableType::VECTOR:
+                        std::cout << "= ";
+                        result.vectorValue.print();
+                        std::cout << std::endl;
+                        break;
+                    case VariableType::MATRIX:
+                        std::cout << "= " << std::endl;
+                        result.matrixValue.print();
+                        break;
+                }
+                Terminal::resetColor();
+            }
+        }
+        
         // 更新状态消息
-        statusMessage = "命令执行成功";
+        if (!enteredStepMode) { // 只有在未进入步骤模式时才更新常规状态
+            if (ast->type == AstNodeType::COMMAND) {
+                const CommandNode* cmdNode = static_cast<const CommandNode*>(ast.get());
+                if (cmdNode->command == "steps") {
+                    if (interpreter.isShowingSteps()) {
+                        statusMessage = "计算步骤显示已开启";
+                    } else {
+                        statusMessage = "计算步骤显示已关闭";
+                    }
+                } else if (cmdNode->command == "clear") {
+                     statusMessage = "屏幕已清除"; 
+                } else {
+                     statusMessage = "命令执行成功";
+                }
+            } else {
+                statusMessage = "命令执行成功";
+            }
+        }
     }
     catch (const std::out_of_range &e)
     {
@@ -583,8 +691,8 @@ void TuiApp::drawStatusBar()
 // 添加新方法以清除结果区域
 void TuiApp::clearResultArea()
 {
-    // 清空结果区域
-    for (int i = resultRow; i < inputRow; i++)
+    // 清空结果区域的实际内容部分
+    for (int i = RESULT_AREA_CONTENT_START_ROW; i < inputRow; i++)
     {
         Terminal::setCursor(i, 0);
         std::string spaces(terminalCols, ' ');
@@ -592,10 +700,13 @@ void TuiApp::clearResultArea()
     }
 
     // 重新绘制结果区域标题
-    Terminal::setCursor(2, 0);
+    Terminal::setCursor(RESULT_AREA_TITLE_ROW, 0);
     Terminal::setForeground(Color::YELLOW);
     std::cout << "输出区域:" << std::endl;
     Terminal::resetColor();
+
+    // 重置 TuiApp::resultRow 成员变量，以便下一次打印从内容区域的顶部开始
+    this->resultRow = RESULT_AREA_CONTENT_START_ROW;
 }
 
 // 添加新方法以显示特定变量的值
@@ -645,4 +756,122 @@ void TuiApp::showVariable(const std::string &varName)
 void TuiApp::drawResultArea()
 {
     clearResultArea();
+}
+
+// 进入步骤展示模式 - 操作历史版本
+void TuiApp::enterStepDisplayMode(const OperationHistory& history) {
+    if (history.size() == 0) return;
+    
+    inStepDisplayMode = true;
+    currentStep = 0;
+    totalSteps = history.size();
+    currentHistory = history;
+    isExpansionHistory = false;
+    
+    // 清屏并显示第一步
+    clearResultArea();
+    displayCurrentStep();
+    drawStepProgressBar();
+    
+    // 更新状态消息
+    statusMessage = "步骤导航模式: 使用←→箭头浏览步骤, ESC退出";
+    drawStatusBar();
+}
+
+// 进入步骤展示模式 - 行列式展开版本
+void TuiApp::enterStepDisplayMode(const ExpansionHistory& history) {
+    if (history.size() == 0) return;
+    
+    inStepDisplayMode = true;
+    currentStep = 0;
+    totalSteps = history.size();
+    currentExpHistory = history;
+    isExpansionHistory = true;
+    
+    // 清屏并显示第一步
+    clearResultArea();
+    displayCurrentStep();
+    drawStepProgressBar();
+    
+    // 更新状态消息
+    statusMessage = "步骤导航模式: 使用←→箭头浏览步骤, ESC退出";
+    drawStatusBar();
+}
+
+// 退出步骤展示模式
+void TuiApp::exitStepDisplayMode() {
+    inStepDisplayMode = false;
+    
+    // 清除结果区域
+    clearResultArea();
+    
+    // 更新状态消息
+    statusMessage = "已退出步骤导航模式";
+    drawStatusBar();
+}
+
+// 显示当前步骤
+void TuiApp::displayCurrentStep() {
+    // 清除旧的步骤内容区域 (在 "步骤 X / Y:" 行之下)
+    for (int i = RESULT_AREA_TITLE_ROW + 2; i < inputRow; i++) { // 从 "步骤 X/Y:" 下一行开始清除
+        Terminal::setCursor(i, 0);
+        std::string spaces(terminalCols, ' ');
+        std::cout << spaces;
+    }
+    
+    // 在结果区域固定位置显示当前步骤信息 ("步骤 X / Y:")
+    Terminal::setCursor(RESULT_AREA_TITLE_ROW + 1, 0); // 例如，行 3
+    Terminal::setForeground(Color::YELLOW);
+    std::cout << "步骤 " << (currentStep + 1) << " / " << totalSteps << ":" << std::endl;
+    Terminal::resetColor();
+    
+    // 根据历史类型在固定位置显示步骤内容
+    // 例如，在 "步骤 X / Y:" 之后空一行开始打印，即行 RESULT_AREA_TITLE_ROW + 3
+    Terminal::setCursor(RESULT_AREA_TITLE_ROW + 3, 0); // 例如，行 5
+    Terminal::setForeground(Color::CYAN);
+    if (isExpansionHistory) {
+        currentExpHistory.getStep(currentStep).print(std::cout);
+    } else {
+        currentHistory.getStep(currentStep).print(std::cout);
+    }
+    Terminal::resetColor();
+}
+
+// 绘制步骤进度条
+void TuiApp::drawStepProgressBar() {
+    // 计算进度条位置
+    int barRow = inputRow - 2;
+    int barWidth = terminalCols - 10; // 留出左右边距
+    int barStart = 5;
+    
+    // 清除进度条行
+    Terminal::setCursor(barRow, 0);
+    std::string spaces(terminalCols, ' ');
+    std::cout << spaces;
+    
+    // 绘制进度条轨道
+    Terminal::setCursor(barRow, barStart);
+    Terminal::setForeground(Color::WHITE);
+    std::cout << "[";
+    for (int i = 0; i < barWidth; i++) {
+        std::cout << "-";
+    }
+    std::cout << "]";
+    
+    // 计算当前步骤指示器位置
+    int indicatorPos = barStart + 1;
+    if (totalSteps > 1) {
+        indicatorPos += static_cast<int>((static_cast<double>(currentStep) / (totalSteps - 1)) * barWidth);
+    }
+    
+    // 绘制当前步骤指示器
+    Terminal::setCursor(barRow, indicatorPos);
+    Terminal::setForeground(Color::GREEN);
+    std::cout << "◆";
+    
+    // 在进度条上方显示步骤号
+    Terminal::setCursor(barRow - 1, indicatorPos - 1);
+    std::cout << currentStep + 1;
+    
+    Terminal::resetColor();
 }

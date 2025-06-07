@@ -1,6 +1,19 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <utility> // For std::pair
+
+// 定义特殊键码
+// 这些常量移到这里，以便 Terminal::readChar 和 TuiApp 都能使用
+const int KEY_ENTER = 13;
+const int KEY_ESCAPE = 27;
+const int KEY_BACKSPACE = 8;
+// const int KEY_DELETE = 127; // _getch() for delete is 224, 83. If needed, map this in readChar.
+// Current KEY_DELETE value 127 is for ASCII DEL.
+const int KEY_UP = 256;
+const int KEY_DOWN = 257;
+const int KEY_LEFT = 258;
+const int KEY_RIGHT = 259;
 
 // 终端颜色
 enum class Color {
