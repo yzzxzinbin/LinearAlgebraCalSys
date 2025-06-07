@@ -21,9 +21,11 @@ private:
     int terminalCols;
     int inputRow;
     int resultRow;
+    size_t cursorPosition; // 新增：跟踪光标在currentInput中的位置
     
     // 命令和历史记录
     std::string currentInput;
+    std::string tempInputBuffer; // 新增：用于在历史导航时暂存当前输入
     std::deque<std::string> history;
     size_t historyIndex;
     

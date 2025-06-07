@@ -6,7 +6,7 @@ Logger* Logger::instance = nullptr;
 
 Logger::Logger() : currentLevel(LogLevel::INFO) {
     // 创建/打开日志文件
-    logFile.open("k:/test program/LinearAlgebraCalSys/application.log", std::ios::out | std::ios::app);
+    logFile.open("application.log", std::ios::out | std::ios::app);
     
     if (!logFile.is_open()) {
         std::cerr << "Failed to open log file!" << std::endl;

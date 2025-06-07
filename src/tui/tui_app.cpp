@@ -14,7 +14,8 @@ const int RESULT_AREA_CONTENT_START_ROW = RESULT_AREA_TITLE_ROW + 1; // 实际�
 
 TuiApp::TuiApp() 
     : historyIndex(0), running(true), 
-      inStepDisplayMode(false), currentStep(0), totalSteps(0), isExpansionHistory(false)
+      inStepDisplayMode(false), currentStep(0), totalSteps(0), isExpansionHistory(false),
+      cursorPosition(0) // 初始化光标位置
 {
     // 初始化终端以支持ANSI转义序列
     if (!Terminal::init())
@@ -141,18 +142,21 @@ void TuiApp::handleInput()
                 int code = Terminal::readChar();
                 switch (code)
                 {
-                case 'A':
+                case 'A': // 上箭头
                     handleSpecialKey(KEY_UP);
-                    break; // 上箭头
-                case 'B':
+                    break; 
+                case 'B': // 下箭头
                     handleSpecialKey(KEY_DOWN);
-                    break; // 下箭头
-                case 'C':
+                    break; 
+                case 'C': // 右箭头
                     handleSpecialKey(KEY_RIGHT);
-                    break; // 右箭头
-                case 'D':
+                    break; 
+                case 'D': // 左箭头
                     handleSpecialKey(KEY_LEFT);
-                    break; // 左箭头
+                    break; 
+                // 根据 tui_terminal.cpp 的 readChar 实现，Delete 键可能不会通过这里
+                // 它可能直接返回一个特定的 KEY_DELETE 值（如果定义了）
+                // 或者需要更复杂的序列检测
                 }
             }
         }
@@ -166,6 +170,7 @@ void TuiApp::handleInput()
             else
             {
                 currentInput.clear(); // 否则清空当前输入
+                cursorPosition = 0;
                 drawInputPrompt();
             }
         }
@@ -186,26 +191,49 @@ void TuiApp::handleInput()
                     history.pop_back();
                 }
             }
+            
+            if (!tempInputBuffer.empty()) { // 清除历史导航时的临时缓冲
+                tempInputBuffer.clear();
+            }
 
             historyIndex = 0;
             currentInput.clear();
+            cursorPosition = 0;
             drawInputPrompt();
         }
     }
     else if (key == KEY_BACKSPACE)
     {
-        // 删除最后一个字符
-        if (!currentInput.empty())
+        // 删除光标前一个字符
+        if (cursorPosition > 0 && !currentInput.empty())
         {
-            currentInput.pop_back();
+            currentInput.erase(cursorPosition - 1, 1);
+            cursorPosition--;
             drawInputPrompt();
         }
     }
-    else if (key >= 32 && key <= 126)
+    // 注意: KEY_DELETE 的处理需要 tui_terminal.cpp 中的 readChar 正确返回一个可识别的 KEY_DELETE 值
+    // 假设 KEY_DELETE 在 tui_terminal.h 中定义，并且 readChar 能返回它
+    // else if (key == KEY_DELETE) { // 处理 Delete 键
+    //     if (cursorPosition < currentInput.length()) {
+    //         currentInput.erase(cursorPosition, 1);
+    //         drawInputPrompt();
+    //     }
+    // }
+    else if (key >= 32 && key <= 126) // 可打印字符
     {
-        // 可打印字符
-        currentInput.push_back(static_cast<char>(key));
+        currentInput.insert(cursorPosition, 1, static_cast<char>(key));
+        cursorPosition++;
         drawInputPrompt();
+        // 如果用户在历史导航时输入，则将当前输入视为新命令
+        if (historyIndex != 0) {
+            historyIndex = 0; // 不再处于历史导航状态
+            // tempInputBuffer 将在下次按 UP 时重新填充，或在按 ENTER 时清除
+        }
+    }
+    else // 处理其他特殊键，如箭头键，这些可能由 readChar 直接返回定义好的常量
+    {
+        handleSpecialKey(key); // 将其他键传递给 handleSpecialKey
     }
 }
 
@@ -592,57 +620,54 @@ void TuiApp::handleSpecialKey(int key)
     case KEY_DOWN:
         navigateHistory(false);
         break;
-        // 可以添加更多特殊键处理
+    case KEY_LEFT:
+        if (cursorPosition > 0) {
+            cursorPosition--;
+            drawInputPrompt();
+        }
+        break;
+    case KEY_RIGHT:
+        if (cursorPosition < currentInput.length()) {
+            cursorPosition++;
+            drawInputPrompt();
+        }
+        break;
+    // case KEY_DELETE: // 如果 readChar 返回 KEY_DELETE
+    //     if (cursorPosition < currentInput.length()) {
+    //         currentInput.erase(cursorPosition, 1);
+    //         drawInputPrompt();
+    //     }
+    //     break;
     }
 }
 
 void TuiApp::navigateHistory(bool up)
 {
-    if (history.empty())
-    {
-        return;
-    }
-
-    if (up)
-    {
-        // 向上浏览历史
-        if (historyIndex < history.size())
-        {
-            // 保存当前输入
-            if (historyIndex == 0)
-            {
-                // 这是第一次按上箭头
-                history.push_front(currentInput);
-                if (history.size() > MAX_HISTORY + 1)
-                {
-                    history.pop_back();
-                }
-            }
-
+    if (up) { // 向上浏览历史
+        if (history.empty()) {
+            return;
+        }
+        if (historyIndex == 0) { // 第一次按上箭头，或从最新输入向上
+            tempInputBuffer = currentInput; // 保存当前输入行
+        }
+        if (historyIndex < history.size()) {
             historyIndex++;
             currentInput = history[historyIndex - 1];
-            drawInputPrompt();
+            cursorPosition = currentInput.length(); // 光标移到末尾
         }
-    }
-    else
-    {
-        // 向下浏览历史
-        if (historyIndex > 1)
-        {
+    } else { // 向下浏览历史
+        if (historyIndex > 1) {
             historyIndex--;
             currentInput = history[historyIndex - 1];
-            drawInputPrompt();
-        }
-        else if (historyIndex == 1)
-        {
-            // 回到最新的输入
+            cursorPosition = currentInput.length(); // 光标移到末尾
+        } else if (historyIndex == 1) { // 到达历史记录的“底部”，恢复之前暂存的输入
             historyIndex = 0;
-            currentInput = history[0];
-            // 删除临时保存的输入
-            history.pop_front();
-            drawInputPrompt();
+            currentInput = tempInputBuffer;
+            // tempInputBuffer.clear(); // 不立即清除，以便再次向上时能恢复
+            cursorPosition = currentInput.length(); // 光标移到末尾
         }
     }
+    drawInputPrompt();
 }
 
 void TuiApp::drawHeader()
@@ -671,16 +696,40 @@ void TuiApp::drawInputPrompt()
     Terminal::setForeground(Color::GREEN);
     std::cout << "> ";
 
-    // 清除行
-    std::string spaces(terminalCols - 2, ' ');
+    // 清除旧的输入行内容
+    std::string spaces(terminalCols - 2, ' '); // -2 for "> "
     std::cout << spaces;
 
-    // 显示当前输入
+    // 重新定位光标以打印输入和模拟光标
     Terminal::setCursor(inputRow, 2);
-    std::cout << currentInput;
 
-    // 将光标定位到输入位置
-    Terminal::setCursor(inputRow, 2 + currentInput.length());
+    // 打印光标前的部分
+    std::cout << currentInput.substr(0, cursorPosition);
+
+    // 模拟光标：反转颜色打印光标下的字符，或者打印特殊字符
+    // 保存当前颜色状态
+    // (如果 Terminal 类支持获取当前颜色会更好，这里假设默认是绿前景白背景)
+    
+    Terminal::setBackground(Color::WHITE); // 设置光标背景色
+    Terminal::setForeground(Color::BLACK); // 设置光标前景色
+
+    if (cursorPosition < currentInput.length()) {
+        std::cout << currentInput[cursorPosition];
+    } else {
+        std::cout << " "; // 如果光标在末尾，显示一个空格作为光标块
+    }
+    
+    Terminal::resetColor(); // 重置颜色到终端默认
+    Terminal::setForeground(Color::GREEN); // 重新应用绿色前景以打印光标后的文本
+
+    // 打印光标后的部分
+    if (cursorPosition < currentInput.length()) {
+        std::cout << currentInput.substr(cursorPosition + 1);
+    }
+
+    // 将真实的终端光标定位到我们模拟光标的逻辑位置之后
+    // 这样，如果终端本身也显示光标，它不会与我们的模拟光标重叠或错位
+    Terminal::setCursor(inputRow, 2 + cursorPosition +1);
 }
 
 void TuiApp::drawStatusBar()
