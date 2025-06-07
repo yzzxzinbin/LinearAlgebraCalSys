@@ -1,6 +1,5 @@
 #include "tui_terminal.h"
 #include <iostream>
-#include <cstdio>
 #include <string>
 
 #ifdef _WIN32
@@ -13,87 +12,63 @@
 #include <fcntl.h>
 #endif
 
+// 初始化终端，启用虚拟终端处理功能
+bool Terminal::init() {
+#ifdef _WIN32
+    // 在Windows上启用虚拟终端处理
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD dwMode = 0;
+    if (!GetConsoleMode(hOut, &dwMode)) {
+        return false;
+    }
+    
+    // 启用ANSI转义序列处理
+    dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    if (!SetConsoleMode(hOut, dwMode)) {
+        return false;
+    }
+    
+    // 设置控制台输入模式
+    HANDLE hIn = GetStdHandle(STD_INPUT_HANDLE);
+    if (!GetConsoleMode(hIn, &dwMode)) {
+        return false;
+    }
+    
+    // 启用快速编辑模式和插入模式
+    dwMode |= ENABLE_QUICK_EDIT_MODE | ENABLE_EXTENDED_FLAGS;
+    if (!SetConsoleMode(hIn, dwMode)) {
+        return false;
+    }
+#endif
+    return true;
+}
+
 // 清屏
 void Terminal::clear() {
-#ifdef _WIN32
-    // Windows 清屏
-    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-    DWORD count;
-    DWORD cellCount;
-    COORD homeCoords = { 0, 0 };
-
-    if (GetConsoleScreenBufferInfo(hConsole, &csbi)) {
-        cellCount = csbi.dwSize.X * csbi.dwSize.Y;
-        FillConsoleOutputCharacter(hConsole, ' ', cellCount, homeCoords, &count);
-        FillConsoleOutputAttribute(hConsole, csbi.wAttributes, cellCount, homeCoords, &count);
-        SetConsoleCursorPosition(hConsole, homeCoords);
-    }
-#else
-    // UNIX-like 系统使用 ANSI 转义序列
+    // 使用ANSI转义序列清屏并将光标移动到左上角
     std::cout << "\033[2J\033[H";
-#endif
 }
 
 // 设置光标位置
 void Terminal::setCursor(int row, int col) {
-#ifdef _WIN32
-    // Windows 设置光标位置
-    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    COORD coord;
-    coord.X = col;
-    coord.Y = row;
-    SetConsoleCursorPosition(hConsole, coord);
-#else
-    // UNIX-like 系统使用 ANSI 转义序列
-    std::cout << "\033[" << row + 1 << ";" << col + 1 << "H";
-#endif
+    // 使用ANSI转义序列设置光标位置
+    std::cout << "\033[" << (row + 1) << ";" << (col + 1) << "H";
 }
 
 // 保存光标位置
 void Terminal::saveCursor() {
-#ifdef _WIN32
-    // Windows 不直接支持此功能，可以自行实现一个全局变量保存位置
-    // 这里简化处理，仅在 UNIX-like 系统实现
-#else
-    // UNIX-like 系统使用 ANSI 转义序列
+    // 使用ANSI转义序列保存光标位置
     std::cout << "\033[s";
-#endif
 }
 
 // 恢复光标位置
 void Terminal::restoreCursor() {
-#ifdef _WIN32
-    // Windows 不直接支持此功能，可以自行实现一个全局变量恢复位置
-    // 这里简化处理，仅在 UNIX-like 系统实现
-#else
-    // UNIX-like 系统使用 ANSI 转义序列
+    // 使用ANSI转义序列恢复光标位置
     std::cout << "\033[u";
-#endif
 }
 
 // 设置前景色
 void Terminal::setForeground(Color color) {
-#ifdef _WIN32
-    // Windows 设置前景色
-    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    WORD wAttributes;
-    
-    switch (color) {
-        case Color::BLACK:      wAttributes = 0; break;
-        case Color::RED:        wAttributes = FOREGROUND_RED; break;
-        case Color::GREEN:      wAttributes = FOREGROUND_GREEN; break;
-        case Color::YELLOW:     wAttributes = FOREGROUND_RED | FOREGROUND_GREEN; break;
-        case Color::BLUE:       wAttributes = FOREGROUND_BLUE; break;
-        case Color::MAGENTA:    wAttributes = FOREGROUND_RED | FOREGROUND_BLUE; break;
-        case Color::CYAN:       wAttributes = FOREGROUND_GREEN | FOREGROUND_BLUE; break;
-        case Color::WHITE:      wAttributes = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE; break;
-        case Color::DEFAULT:    wAttributes = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE; break;
-    }
-    
-    SetConsoleTextAttribute(hConsole, wAttributes);
-#else
-    // UNIX-like 系统使用 ANSI 转义序列
     int colorCode;
     
     switch (color) {
@@ -109,31 +84,10 @@ void Terminal::setForeground(Color color) {
     }
     
     std::cout << "\033[" << colorCode << "m";
-#endif
 }
 
 // 设置背景色
 void Terminal::setBackground(Color color) {
-#ifdef _WIN32
-    // Windows 设置背景色
-    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    WORD wAttributes;
-    
-    switch (color) {
-        case Color::BLACK:      wAttributes = 0; break;
-        case Color::RED:        wAttributes = BACKGROUND_RED; break;
-        case Color::GREEN:      wAttributes = BACKGROUND_GREEN; break;
-        case Color::YELLOW:     wAttributes = BACKGROUND_RED | BACKGROUND_GREEN; break;
-        case Color::BLUE:       wAttributes = BACKGROUND_BLUE; break;
-        case Color::MAGENTA:    wAttributes = BACKGROUND_RED | BACKGROUND_BLUE; break;
-        case Color::CYAN:       wAttributes = BACKGROUND_GREEN | BACKGROUND_BLUE; break;
-        case Color::WHITE:      wAttributes = BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE; break;
-        case Color::DEFAULT:    wAttributes = 0; break;
-    }
-    
-    SetConsoleTextAttribute(hConsole, wAttributes);
-#else
-    // UNIX-like 系统使用 ANSI 转义序列
     int colorCode;
     
     switch (color) {
@@ -149,19 +103,12 @@ void Terminal::setBackground(Color color) {
     }
     
     std::cout << "\033[" << colorCode << "m";
-#endif
 }
 
 // 重置颜色
 void Terminal::resetColor() {
-#ifdef _WIN32
-    // Windows 重置颜色
-    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
-#else
-    // UNIX-like 系统使用 ANSI 转义序列
+    // 使用ANSI转义序列重置所有属性
     std::cout << "\033[0m";
-#endif
 }
 
 // 获取终端大小
@@ -170,14 +117,12 @@ std::pair<int, int> Terminal::getSize() {
     int cols = 80;  // 默认值
     
 #ifdef _WIN32
-    // Windows 获取终端大小
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi)) {
         cols = csbi.srWindow.Right - csbi.srWindow.Left + 1;
         rows = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
     }
 #else
-    // UNIX-like 系统获取终端大小
     struct winsize w;
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) != -1) {
         rows = w.ws_row;
@@ -191,23 +136,16 @@ std::pair<int, int> Terminal::getSize() {
 // 启用/禁用原始模式
 void Terminal::setRawMode(bool enable) {
 #ifdef _WIN32
-    // Windows 不需要特殊处理，使用 _getch() 就可以无需回车读取字符
+    // Windows使用原生API读取字符，不需要特殊设置
 #else
-    // UNIX-like 系统设置终端模式
     static struct termios oldTermios, newTermios;
     
     if (enable) {
-        // 获取当前终端设置
         tcgetattr(STDIN_FILENO, &oldTermios);
         newTermios = oldTermios;
-        
-        // 禁用规范模式和回显
         newTermios.c_lflag &= ~(ICANON | ECHO);
-        
-        // 设置新的终端设置
         tcsetattr(STDIN_FILENO, TCSANOW, &newTermios);
     } else {
-        // 恢复原始设置
         tcsetattr(STDIN_FILENO, TCSANOW, &oldTermios);
     }
 #endif
@@ -216,10 +154,8 @@ void Terminal::setRawMode(bool enable) {
 // 读取一个字符
 int Terminal::readChar() {
 #ifdef _WIN32
-    // Windows 使用 _getch() 读取字符
     return _getch();
 #else
-    // UNIX-like 系统读取字符
     char c;
     read(STDIN_FILENO, &c, 1);
     return (int)c;
@@ -229,10 +165,8 @@ int Terminal::readChar() {
 // 检查是否有输入可用
 bool Terminal::hasInput() {
 #ifdef _WIN32
-    // Windows 检查是否有键盘输入
     return _kbhit() != 0;
 #else
-    // UNIX-like 系统检查是否有输入可用
     struct timeval tv = {0, 0};
     fd_set fds;
     FD_ZERO(&fds);

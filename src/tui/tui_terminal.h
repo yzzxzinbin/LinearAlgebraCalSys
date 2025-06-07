@@ -18,6 +18,9 @@ enum class Color {
 // 终端控制类
 class Terminal {
 public:
+    // 初始化终端（启用虚拟终端处理）
+    static bool init();
+    
     // 清屏
     static void clear();
     

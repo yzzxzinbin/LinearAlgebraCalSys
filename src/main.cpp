@@ -14,11 +14,10 @@ int main() {
         LOG_INFO("应用程序启动");
         
         // 设置控制台编码为UTF-8
-        #ifdef _WIN32
         SetConsoleCP(65001);       // 设置控制台输入为UTF-8编码
         SetConsoleOutputCP(65001); // 设置控制台输出为UTF-8编码
         LOG_INFO("控制台编码设置为UTF-8");
-        #endif
+
         
         // 创建并运行TUI应用程序
         LOG_INFO("创建TUI应用程序");
