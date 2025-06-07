@@ -2,6 +2,8 @@
 #include <memory>
 #include <unordered_map>
 #include <string>
+#include <vector> // 确保 vector 也被包含
+#include <deque>  // 新增：包含 deque 头文件
 #include "grammar_parser.h"
 #include "../matrix.h"
 #include "../vector.h"
@@ -50,6 +52,8 @@ private:
 
 
 public:
+    static const std::string HISTORY_MARKER; // 新增：历史记录标记
+
     Interpreter();
     
     // 执行语法树
@@ -79,9 +83,9 @@ public:
     // 新增：清除当前历史记录
     void clearCurrentHistories();
 
-    // 新增：导出和导入变量的方法
-    std::string exportVariables(const std::string& filename);
-    std::string importVariables(const std::string& filename);
+    // 修改：导出和导入变量的方法签名
+    std::string exportVariables(const std::string& filename, const std::deque<std::string>& commandHistory);
+    std::pair<std::string, std::vector<std::string>> importVariables(const std::string& filename);
 
 private:
     // 执行各种节点类型

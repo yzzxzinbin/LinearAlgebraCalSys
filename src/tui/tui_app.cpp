@@ -370,6 +370,53 @@ void TuiApp::executeCommand(const std::string &input)
             return;
         }
 
+        // 处理export命令
+        if (commandStr == "export" && commandArgs.size() == 1) {
+            std::string filename = commandArgs[0];
+            std::string export_message = interpreter.exportVariables(filename, history); // 传递历史记录
+            printToResultView(export_message, Color::YELLOW);
+            statusMessage = export_message;
+            return;
+        }
+
+        // 处理import命令
+        if (commandStr == "import" && commandArgs.size() == 1) {
+            std::string filename = commandArgs[0];
+            auto import_result = interpreter.importVariables(filename);
+            std::string import_message = import_result.first;
+            const auto& imported_cmds_from_file = import_result.second; // 文件中的顺序 (最新在前)
+
+            printToResultView(import_message, Color::YELLOW);
+            statusMessage = import_message;
+
+            // 集成导入的历史记录
+            // imported_cmds_from_file 是从文件中读取的顺序 (最新命令在前)
+            // 我们希望将它们按此顺序添加到历史记录的前面
+            // 因此，我们逆序遍历导入的命令 (从最旧的导入命令开始)
+            // 并将它们 push_front 到 TuiApp 的 history 队列
+            for (auto it = imported_cmds_from_file.rbegin(); it != imported_cmds_from_file.rend(); ++it) {
+                const std::string& cmd_to_add = *it;
+                // 避免添加重复项
+                bool exists = false;
+                for (const auto& existing_cmd : history) {
+                    if (existing_cmd == cmd_to_add) {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists) {
+                    history.push_front(cmd_to_add);
+                }
+            }
+            // 修剪历史记录，如果超出最大大小
+            while (history.size() > MAX_HISTORY) {
+                history.pop_back(); // 移除最旧的命令
+            }
+            historyIndex = 0; // 重置历史导航索引
+
+            return;
+        }
+
 
         // 处理show命令
         if (processedInput.substr(0, 4) == "show" && processedInput.length() > 5)
@@ -605,6 +652,12 @@ void TuiApp::showHelp()
     resultRow++;
     Terminal::setCursor(resultRow, 0);
     std::cout << "  edit <变量名>    - 编辑已存在的矩阵或向量变量\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
+    std::cout << "  export <文件名>   - 导出所有变量到文件\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
+    std::cout << "  import <文件名>   - 从文件导入变量\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
     std::cout << "\n";
@@ -945,7 +998,7 @@ void TuiApp::showVariable(const std::string &varName)
         resultRow++;
         break;
     case VariableType::MATRIX:
-        std::cout << std::endl; // 为 "m = " 和矩阵内容之间提供一行间隔
+        std::cout << "\n"; // 为 "m = " 和矩阵内容之间提供一行间隔
         resultRow++;
         // 与 showVariables 类似地处理矩阵打印
         {

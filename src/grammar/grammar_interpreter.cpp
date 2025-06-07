@@ -107,19 +107,13 @@ void Interpreter::executeCommand(const std::string& command, const std::vector<s
         std::cout << "计算步骤显示: " << (showSteps ? "开启" : "关闭") << "\n";
     } else if (commandLower == "new" || commandLower == "edit") {
         // 由 TuiApp 处理
-    } else if (commandLower == "export") {
-        if (args.empty()) {
-            throw std::runtime_error("export 命令需要一个文件名参数。");
-        }
-        std::string message = exportVariables(args[0]);
-        std::cout << message << std::endl; // TuiApp 将捕获此输出或解释器应返回消息
-                                          // 对于TUI，最好是通过返回消息给TuiApp来显示
-    } else if (commandLower == "import") {
-        if (args.empty()) {
-            throw std::runtime_error("import 命令需要一个文件名参数。");
-        }
-        std::string message = importVariables(args[0]);
-        std::cout << message << std::endl;
+        // 这些命令主要用于触发 TuiApp 中的特定模式，而不是由解释器直接执行逻辑
+    } else if (commandLower == "export" || commandLower == "import") {
+        // 文件导出/导入命令由 TuiApp::executeCommand 直接调用 Interpreter 的
+        // exportVariables/importVariables 方法处理。
+        // Interpreter::executeCommand 本身不执行这些文件操作。
+        // 可以记录一个日志或什么都不做。
+        LOG_INFO("命令 '" + command + "' 已由 TuiApp 处理。");
     } else {
         throw std::runtime_error("未知命令: " + command);
     }

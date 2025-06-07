@@ -2,6 +2,11 @@
 #include "grammar_interpreter.h"
 #include <stdexcept>
 #include <sstream>
+#include <fstream> // 需要包含 fstream
+#include <deque>
+#include "../utils/logger.h" // 确保包含 logger
+
+const std::string Interpreter::HISTORY_MARKER = "HISTORY_ENTRY:"; // 定义历史记录标记
 
 std::vector<std::string> Interpreter::splitString(const std::string &s, char delimiter) const
 {
@@ -228,7 +233,7 @@ std::pair<std::string, Variable> Interpreter::deserializeLine(const std::string 
     return {name, var};
 }
 
-std::string Interpreter::exportVariables(const std::string &filename)
+std::string Interpreter::exportVariables(const std::string &filename, const std::deque<std::string>& commandHistory)
 {
     std::ofstream outFile(filename);
     if (!outFile.is_open())
@@ -236,6 +241,8 @@ std::string Interpreter::exportVariables(const std::string &filename)
         LOG_ERROR("无法打开文件进行导出: " + filename);
         return "错误: 无法打开文件 '" + filename + "' 进行导出。";
     }
+
+    // 序列化变量
     for (const auto &pair : variables)
     {
         try
@@ -245,43 +252,57 @@ std::string Interpreter::exportVariables(const std::string &filename)
         catch (const std::exception &e)
         {
             LOG_ERROR("序列化变量 " + pair.first + " 时出错: " + e.what());
-            outFile.close(); // 关闭文件以防万一
+            outFile.close(); 
             return "错误: 序列化变量 " + pair.first + " 时出错: " + e.what();
         }
     }
+
+    // 序列化命令历史 (从最新到最旧)
+    LOG_INFO("开始导出命令历史到 " + filename);
+    for (const auto& command : commandHistory) { // deque 迭代器从头到尾 (即最新到最旧)
+        outFile << HISTORY_MARKER << command << std::endl;
+    }
+    
     outFile.close();
-    LOG_INFO("变量已成功导出到 " + filename);
-    return "变量已成功导出到 " + filename;
+    LOG_INFO("变量和命令历史已成功导出到 " + filename);
+    return "变量和命令历史已成功导出到 " + filename;
 }
 
-std::string Interpreter::importVariables(const std::string &filename)
+std::pair<std::string, std::vector<std::string>> Interpreter::importVariables(const std::string &filename)
 {
+    std::vector<std::string> importedHistoryCommands;
     std::ifstream inFile(filename);
     if (!inFile.is_open())
     {
         LOG_ERROR("无法打开文件进行导入: " + filename);
-        return "错误: 无法打开文件 '" + filename + "' 进行导入。";
+        return {"错误: 无法打开文件 '" + filename + "' 进行导入。", importedHistoryCommands};
     }
     std::string line;
     int lineNum = 0;
     while (std::getline(inFile, line))
     {
         lineNum++;
-        if (line.empty() || line[0] == '#')
-            continue; // 跳过空行和注释
-        try
-        {
-            auto pair = deserializeLine(line);
-            variables[pair.first] = pair.second;
-        }
-        catch (const std::exception &e)
-        {
-            LOG_ERROR("导入文件 " + filename + " 第 " + std::to_string(lineNum) + " 行时出错: " + e.what());
-            inFile.close();
-            return "错误: 导入文件 " + filename + " 第 " + std::to_string(lineNum) + " 行时出错: " + e.what();
+        if (line.empty() || line[0] == '#') // 跳过空行和注释
+            continue; 
+
+        // 检查行是否以 HISTORY_MARKER 开头
+        if (line.rfind(HISTORY_MARKER, 0) == 0) { 
+            importedHistoryCommands.push_back(line.substr(HISTORY_MARKER.length()));
+        } else {
+            try
+            {
+                auto pair = deserializeLine(line);
+                variables[pair.first] = pair.second;
+            }
+            catch (const std::exception &e)
+            {
+                LOG_ERROR("导入文件 " + filename + " 第 " + std::to_string(lineNum) + " 行时出错: " + e.what());
+                inFile.close();
+                return {"错误: 导入文件 " + filename + " 第 " + std::to_string(lineNum) + " 行时出错: " + e.what(), importedHistoryCommands};
+            }
         }
     }
     inFile.close();
-    LOG_INFO("变量已成功从 " + filename + " 导入");
-    return "变量已成功从 " + filename + " 导入。";
+    LOG_INFO("变量和命令历史已成功从 " + filename + " 导入");
+    return {"变量和命令历史已成功从 " + filename + " 导入。", importedHistoryCommands};
 }
