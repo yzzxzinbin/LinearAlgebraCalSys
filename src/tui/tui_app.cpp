@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 #include <algorithm>
+#include <iomanip> // 新增：用于设置浮点数输出精度
 #include "../utils/logger.h"
 #include "../grammar/grammar_tokenizer.h"
 #include "../grammar/grammar_parser.h"
@@ -479,14 +480,43 @@ void TuiApp::executeCommand(const std::string &input)
         // 处理show命令
         if (processedInput.substr(0, 4) == "show" && processedInput.length() > 5)
         {
-            std::string varName = processedInput.substr(5);
+            std::string params = processedInput.substr(5);
             // 去除可能的结尾分号
-            if (!varName.empty() && varName.back() == ';')
+            if (!params.empty() && params.back() == ';')
             {
-                varName.pop_back();
+                params.pop_back();
             }
-            // showVariable 内部使用 resultRow，它现在是命令之后的那一行
-            showVariable(varName);
+            
+            // 提取变量名和选项
+            std::istringstream iss(params);
+            std::string varName, option;
+            iss >> varName; // 第一个词是变量名
+            
+            bool useFloat = false;
+            int precision = 2; // 默认精度为2位小数
+            
+            // 检查是否有更多参数
+            if (iss >> option) {
+                // 检查是否是 -f 选项
+                if (option.substr(0, 2) == "-f") {
+                    useFloat = true;
+                    // 检查是否指定了精度
+                    if (option.length() > 2) {
+                        try {
+                            precision = std::stoi(option.substr(2));
+                        } catch (const std::exception&) {
+                            // 解析精度失败，使用默认值
+                        }
+                    }
+                }
+            }
+            
+            // 根据选项显示变量
+            if (useFloat) {
+                showVariableWithFormat(varName, precision);
+            } else {
+                showVariable(varName);
+            }
             return;
         }
 
@@ -689,34 +719,34 @@ void TuiApp::showHelp()
     std::cout << "帮助信息：\n"; // 示例：这会占用 resultRow
     resultRow++;                 // 更新 resultRow
     Terminal::setCursor(resultRow, 0);
-    std::cout << "  help             - 显示此帮助信息\n";
+    std::cout << "  help                           - 显示此帮助信息\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
-    std::cout << "  clear            - 清屏\n";
+    std::cout << "  clear                          - 清屏\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
-    std::cout << "  vars             - 显示所有变量\n";
+    std::cout << "  vars                           - 显示所有变量\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
-    std::cout << "  show <变量名>     - 显示特定变量的值\n";
+    std::cout << "  show <变量名> -f<精度>(可选)   - 显示特定变量的值\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
-    std::cout << "  exit             - 退出程序\n";
+    std::cout << "  exit                           - 退出程序\n";   
     resultRow++;
     Terminal::setCursor(resultRow, 0);
-    std::cout << "  steps            - 切换计算步骤显示\n";
+    std::cout << "  steps                          - 切换计算步骤显示\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
-    std::cout << "  new <行数> <列数> - 创建一个新的矩阵变量 (例如: new 2 3)\n";
+    std::cout << "  new <行数> <列数>              - 创建一个新的矩阵变量 (例如: new 2 3)\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
-    std::cout << "  edit <变量名>    - 编辑已存在的矩阵或向量变量\n";
+    std::cout << "  edit <变量名>                  - 编辑已存在的矩阵或向量变量\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
-    std::cout << "  export <文件名>   - 导出所有变量到文件\n";
+    std::cout << "  export <文件名>                - 导出所有变量到文件\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
-    std::cout << "  import <文件名>   - 从文件导入变量\n";
+    std::cout << "  import <文件名>                - 从文件导入变量\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
     std::cout << "\n";
@@ -1082,6 +1112,74 @@ void TuiApp::showVariable(const std::string &varName)
     }
     Terminal::resetColor();
     statusMessage = "显示变量: " + varName;
+}
+
+void TuiApp::showVariableWithFormat(const std::string &varName, int precision) {
+    if (matrixEditor) return; // 不在编辑器模式下显示变量
+    const auto &vars = interpreter.getVariables();
+    auto it = vars.find(varName);
+
+    // resultRow 当前指向命令行的下一行
+    Terminal::setCursor(resultRow, 0);
+
+    if (it == vars.end()) {
+        Terminal::setForeground(Color::RED);
+        std::cout << "错误: 变量 '" << varName << "' 未定义。" << std::endl;
+        Terminal::resetColor();
+        resultRow++;
+        statusMessage = "变量未找到: " + varName;
+        return;
+    }
+
+    Terminal::setForeground(Color::CYAN);
+    std::cout << varName << " = ";
+
+    // 设置输出格式为浮点数，精度为指定值
+    std::cout << std::fixed << std::setprecision(precision);
+
+    switch (it->second.type) {
+    case VariableType::FRACTION:
+        {
+            double fval = (double)it->second.fractionValue.getNumerator() / it->second.fractionValue.getDenominator();
+            std::cout << fval << std::endl;
+            resultRow++;
+        }
+        break;
+    case VariableType::VECTOR:
+        std::cout << "[";
+        for (size_t i = 0; i < it->second.vectorValue.size(); ++i) {
+            double fval = (double)it->second.vectorValue.at(i).getNumerator() / it->second.vectorValue.at(i).getDenominator();
+            std::cout << fval;
+            if (i < it->second.vectorValue.size() - 1) {
+                std::cout << ", ";
+            }
+        }
+        std::cout << "]" << std::endl;
+        resultRow++;
+        break;
+    case VariableType::MATRIX:
+        std::cout << "\n"; // 为 "m = " 和矩阵内容之间提供一行间隔
+        resultRow++;
+        
+        for (size_t r = 0; r < it->second.matrixValue.rowCount(); ++r) {
+            Terminal::setCursor(resultRow, 0);
+            std::cout << "| ";
+            for (size_t c = 0; c < it->second.matrixValue.colCount(); ++c) {
+                double fval = (double)it->second.matrixValue.at(r, c).getNumerator() / it->second.matrixValue.at(r, c).getDenominator();
+                std::cout << std::setw(8) << fval << " ";
+            }
+            std::cout << "|" << std::endl;
+            resultRow++;
+        }
+        break;
+    }
+
+    // 恢复默认输出格式
+    std::cout.unsetf(std::ios_base::fixed);
+    std::cout.precision(6); // 恢复默认精度
+
+    Terminal::resetColor();
+    statusMessage = "以浮点数格式显示变量: " + varName + " (精度: " + std::to_string(precision) + ")";
 }
 
 void TuiApp::drawResultArea()
