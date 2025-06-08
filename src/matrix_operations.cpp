@@ -153,17 +153,20 @@ void MatrixOperations::toRowEchelonForm(Matrix& mat, OperationHistory& history) 
             swapRows(mat, r, i, history);
         }
         
-        // 将主元归一化
-        Fraction pivot = mat.at(r, lead);
-        if (pivot != Fraction(1)) {
-            scaleRow(mat, r, Fraction(1) / pivot, history);
-        }
+        // 移除以下主元归一化代码
+        // Fraction pivot = mat.at(r, lead);
+        // if (pivot != Fraction(1)) {
+        //     scaleRow(mat, r, Fraction(1) / pivot, history);
+        // }
         
         // 消去下方行的对应元素
         for (size_t i = r + 1; i < rowCount; ++i) {
             Fraction factor = mat.at(i, lead);
             if (factor != Fraction(0)) {
-                addScaledRow(mat, i, r, -factor, history);
+                Fraction pivot = mat.at(r, lead);
+                // 直接计算消元系数，无需先将主元归一
+                Fraction elimFactor = -factor / pivot;
+                addScaledRow(mat, i, r, elimFactor, history);
             }
         }
         
@@ -194,11 +197,34 @@ void MatrixOperations::toReducedRowEchelonForm(Matrix& mat, OperationHistory& hi
     size_t rowCount = mat.rowCount();
     size_t colCount = mat.colCount();
     
+    // 先将每行的主元归一化
+    for (size_t r = 0; r < rowCount; ++r) {
+        // 找到当前行的主元位置
+        int lead = -1;
+        for (size_t j = 0; j < colCount; ++j) {
+            if (mat.at(r, j) != Fraction(0)) {
+                lead = j;
+                break;
+            }
+        }
+        
+        if (lead == -1) {
+            continue; // 当前行没有主元（零行）
+        }
+        
+        // 将主元归一化
+        Fraction pivot = mat.at(r, lead);
+        if (pivot != Fraction(1)) {
+            scaleRow(mat, r, Fraction(1) / pivot, history);
+        }
+    }
+    
+    // 从下往上消元，使每个主元上方的元素都为0
     for (int r = rowCount - 1; r >= 0; --r) {
         // 找到当前行的主元位置
         int lead = -1;
         for (size_t j = 0; j < colCount; ++j) {
-            if (mat.at(r, j) == Fraction(1)) {
+            if (mat.at(r, j) == Fraction(1)) {  // 现在主元已经是1了
                 lead = j;
                 break;
             }
