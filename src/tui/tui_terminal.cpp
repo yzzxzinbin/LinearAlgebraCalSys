@@ -165,22 +165,48 @@ void Terminal::setRawMode(bool enable) {
 int Terminal::readChar() {
 #ifdef _WIN32
     int c = _getch();
-    if (c == 0 || c == 224) { // 特殊键前缀 (0xE0 等价于 224)
-        int scancode = _getch(); // 读取实际的扫描码
+    
+    // 检测CTRL+ENTER
+    if (c == 10 || (c == 13 && (GetAsyncKeyState(VK_CONTROL) & 0x8000))) {
+        return KEY_CTRL_ENTER;
+    }
+    
+    // 处理特殊键前缀
+    if (c == 0 || c == 224) {
+        int scancode = _getch();
+        
+        // 根据您的调试结果，CTRL+方向键可能会产生特殊的扫描码
+        // 因此直接根据扫描码返回对应的键值，而不检测CTRL状态
         switch (scancode) {
-            case 72: return KEY_UP;    // 上箭头
-            case 80: return KEY_DOWN;  // 下箭头
-            case 75: return KEY_LEFT;  // 左箭头
-            case 77: return KEY_RIGHT; // 右箭头
-            // case 83: return KEY_DELETE; // 如果需要映射 Delete 键 (ASCII DEL 是 127, Windows 扫描码是 83)
-            // 可以根据需要添加其他特殊键的映射
-            default: return -1; // 未处理的特殊键，或返回一个组合码 (c << 8) | scancode
+            // 普通方向键
+            case 72: return KEY_UP;          // 上箭头
+            case 80: return KEY_DOWN;        // 下箭头
+            case 75: return KEY_LEFT;        // 左箭头
+            case 77: return KEY_RIGHT;       // 右箭头
+            
+            // CTRL+方向键的特殊扫描码 - 这些值可能需要根据实际测试调整
+            case 116: return KEY_CTRL_RIGHT;  // CTRL+右箭头 (根据您的调试)
+            case 115: return KEY_CTRL_LEFT;   // CTRL+左箭头 (推测值，需要测试)
+            case 141: return KEY_CTRL_UP;     // CTRL+上箭头 (推测值，需要测试)
+            case 145: return KEY_CTRL_DOWN;   // CTRL+下箭头 (推测值，需要测试)
+            
+            case 83: return KEY_DELETE;      // Delete键
+            default: 
+                // 调试未知扫描码 - 您可以在此处添加代码，将未知扫描码打印到日志
+                // 如果遇到未识别的扫描码，可以修改此函数以处理它们
+                return -1;  // 未处理的特殊键
         }
     }
+    
     return c; // 普通键
 #else
     unsigned char c_val;
     if (read(STDIN_FILENO, &c_val, 1) == 1) {
+        // CTRL+Enter检测
+        if (c_val == 10 && (fcntl(STDIN_FILENO, F_GETFL) & O_NONBLOCK)) {
+            return KEY_CTRL_ENTER;
+        }
+        
         // 处理ANSI转义序列
         if (c_val == 27) { // ESC字符
             // 检查是否是转义序列的一部分
@@ -196,9 +222,25 @@ int Terminal::readChar() {
             if (select(STDIN_FILENO + 1, &readfds, NULL, NULL, &timeout) > 0) {
                 unsigned char next;
                 if (read(STDIN_FILENO, &next, 1) == 1) {
-                    if (next == '[') { // ESC [ 序列
+                    // 检测CTRL+方向键 (Linux中通常是 ESC [ 1 ; 5 A/B/C/D)
+                    if (next == '[') { 
                         unsigned char code;
                         if (read(STDIN_FILENO, &code, 1) == 1) {
+                            if (code == '1') {
+                                char semicolon, five, direction;
+                                if (read(STDIN_FILENO, &semicolon, 1) == 1 && semicolon == ';' &&
+                                    read(STDIN_FILENO, &five, 1) == 1 && five == '5' &&
+                                    read(STDIN_FILENO, &direction, 1) == 1) {
+                                    switch (direction) {
+                                        case 'A': return KEY_CTRL_UP;
+                                        case 'B': return KEY_CTRL_DOWN;
+                                        case 'C': return KEY_CTRL_RIGHT;
+                                        case 'D': return KEY_CTRL_LEFT;
+                                    }
+                                }
+                            }
+                            
+                            // 处理普通方向键
                             switch (code) {
                                 case 'A': return KEY_UP;    // 上箭头
                                 case 'B': return KEY_DOWN;  // 下箭头

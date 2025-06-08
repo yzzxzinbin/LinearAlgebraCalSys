@@ -10,6 +10,7 @@
 #include "../operation_step.h"
 #include "../determinant_expansion.h"
 #include "tui_terminal.h"
+#include "enhanced_matrix_editor.h" // 新增：包含增强型编辑器头文件
 
 // 最大历史记录数量
 const int MAX_HISTORY = 50;
@@ -45,15 +46,18 @@ private:
     ExpansionHistory currentExpHistory;
     bool isExpansionHistory;
 
-    // 新增：矩阵编辑模式相关状态
-    bool inMatrixEditMode;
-    std::string editingVariableName;
-    Variable editingVariableCopy; // 编辑对象的副本
-    bool editingIsMatrix;         // 标记正在编辑的是矩阵还是向量
-    size_t editCursorRow;         // 编辑器内光标行
-    size_t editCursorCol;         // 编辑器内光标列
-    std::string currentCellInput;   // 当前单元格的输入字符串
-    bool cellInputActive;         // 单元格是否处于输入激活状态
+    // 移除旧的矩阵编辑模式相关状态
+    // bool inMatrixEditMode;
+    // std::string editingVariableName;
+    // Variable editingVariableCopy; 
+    // bool editingIsMatrix;         
+    // size_t editCursorRow;         
+    // size_t editCursorCol;         
+    // std::string currentCellInput;   
+    // bool cellInputActive;         
+
+    // 新增：增强型矩阵编辑器实例
+    std::unique_ptr<EnhancedMatrixEditor> matrixEditor;
     
     // 绘制UI元素
     void drawHeader();
@@ -65,7 +69,8 @@ private:
     // 处理命令和输入
     void handleSpecialKey(int key);
     void navigateHistory(bool up);
-    void handleMatrixEditInput(int key); // 新增：处理矩阵编辑模式下的输入
+    // 移除旧的矩阵编辑模式输入处理函数
+    // void handleMatrixEditInput(int key); 
     
     // 命令执行函数
     void showHelp();
@@ -79,11 +84,11 @@ private:
     void displayCurrentStep();
     void drawStepProgressBar();
 
-    // 新增：矩阵编辑模式相关函数
-    void enterMatrixEditMode(const std::string& varName, bool isNew, bool isMatrix, int rows = 0, int cols = 0);
-    void exitMatrixEditMode(bool saveChanges);
-    void drawMatrixEditor();
-    std::string generateNewVariableName(bool isMatrix);
+    // 移除旧的矩阵编辑模式相关函数
+    // void enterMatrixEditMode(const std::string& varName, bool isNew, bool isMatrix, int rows = 0, int cols = 0);
+    // void exitMatrixEditMode(bool saveChanges);
+    // void drawMatrixEditor();
+    std::string generateNewVariableName(bool isMatrix); // 保持此辅助函数
     
     // 辅助函数
     void printToResultView(const std::string& text, Color color = Color::DEFAULT);

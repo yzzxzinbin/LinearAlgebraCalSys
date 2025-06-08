@@ -60,4 +60,13 @@ public:
     
     // 新增辅助方法：从增广矩阵中提取右侧部分
     Matrix extractRightPart(size_t colStart) const;
+
+    // 新增：用于编辑器修改矩阵结构的方法
+    void addRow(size_t rowIndex, const std::vector<Fraction>& rowData); // 在指定索引处插入行
+    void addRow(size_t rowIndex); // 在指定索引处插入零行, rowIndex可以等于rowCount()表示末尾添加
+    void addColumn(size_t colIndex, const std::vector<Fraction>& colData); // 在指定索引处插入列
+    void addColumn(size_t colIndex); // 在指定索引处插入零列, colIndex可以等于colCount()表示末尾添加
+    void deleteRow(size_t rowIndex);
+    void deleteColumn(size_t colIndex);
+    void resize(size_t newRows, size_t newCols); // 调整大小，用0填充新元素
 };

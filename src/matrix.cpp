@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <algorithm>
 #include <sstream>
+#include <stdexcept> // Required for std::out_of_range, std::invalid_argument
 
 Matrix::Matrix(size_t r, size_t c) : rows(r), cols(c), data(r, std::vector<Fraction>(c)) {}
 
@@ -513,8 +514,8 @@ Matrix Matrix::identity(size_t n) {
 
 // 从增广矩阵中提取右侧部分
 Matrix Matrix::extractRightPart(size_t colStart) const {
-    if (colStart >= cols) {
-        throw std::invalid_argument("Starting column index out of range");
+    if (colStart > cols) { // Allow colStart == cols for empty result
+        throw std::out_of_range("Starting column index out of range for extractRightPart");
     }
     
     Matrix result(rows, cols - colStart);
@@ -526,4 +527,119 @@ Matrix Matrix::extractRightPart(size_t colStart) const {
     }
     
     return result;
+}
+
+// 新增：用于编辑器修改矩阵结构的方法实现
+void Matrix::addRow(size_t rowIndex, const std::vector<Fraction>& rowData) {
+    if (rowData.size() != cols && cols != 0) { // Allow adding row to 0-col matrix if rowData is also empty or cols will become rowData.size()
+        if (cols == 0 && rows == 0) { // Special case: first row in an empty matrix
+             cols = rowData.size();
+        } else {
+            throw std::invalid_argument("Row data size mismatch with matrix column count.");
+        }
+    }
+    if (rowIndex > rows) {
+        throw std::out_of_range("Row index out of range for addRow.");
+    }
+    data.insert(data.begin() + rowIndex, rowData.empty() && cols > 0 ? std::vector<Fraction>(cols) : rowData);
+    rows++;
+}
+
+void Matrix::addRow(size_t rowIndex) {
+    if (rowIndex > rows) {
+        throw std::out_of_range("Row index out of range for addRow.");
+    }
+    data.insert(data.begin() + rowIndex, std::vector<Fraction>(cols)); // Insert a row of zeros
+    rows++;
+}
+
+void Matrix::addColumn(size_t colIndex, const std::vector<Fraction>& colData) {
+    if (colData.size() != rows && rows != 0) {
+         if (rows == 0 && cols == 0) { // Special case: first col in an empty matrix
+            rows = colData.size();
+        } else {
+            throw std::invalid_argument("Column data size mismatch with matrix row count.");
+        }
+    }
+    if (colIndex > cols) {
+        throw std::out_of_range("Column index out of range for addColumn.");
+    }
+    if (rows == 0 && cols == 0 && !colData.empty()) { // Adding first column to empty matrix
+        for(const auto& val : colData) {
+            data.push_back({val});
+        }
+    } else {
+        for (size_t i = 0; i < rows; ++i) {
+            data[i].insert(data[i].begin() + colIndex, colData.empty() && rows > 0 ? Fraction(0) : colData[i]);
+        }
+    }
+    cols++;
+}
+
+void Matrix::addColumn(size_t colIndex) {
+    if (colIndex > cols) {
+        throw std::out_of_range("Column index out of range for addColumn.");
+    }
+     if (rows == 0 && cols == 0) { // Adding a column to a completely empty matrix, results in 0-row, 1-col matrix
+        // This case is tricky. If rows is 0, adding a column of zeros means nothing changes in data.
+        // Let's assume if rows is 0, adding a column means it's still 0 rows.
+        // The editor should probably ensure matrix has at least 1 row before adding columns if it's empty.
+        // Or, default to adding a 1-row, 1-col matrix of [0] if completely empty.
+        // For now, if rows is 0, this does not change data structure for data[i].insert.
+    } else {
+        for (size_t i = 0; i < rows; ++i) {
+            data[i].insert(data[i].begin() + colIndex, Fraction(0)); // Insert zero
+        }
+    }
+    cols++;
+}
+
+void Matrix::deleteRow(size_t rowIndex) {
+    if (rowIndex >= rows) {
+        throw std::out_of_range("Row index out of range for deleteRow.");
+    }
+    if (rows == 0) return; // Cannot delete from empty matrix
+    data.erase(data.begin() + rowIndex);
+    rows--;
+    if (rows == 0) cols = 0; // If all rows deleted, it's an empty matrix
+}
+
+void Matrix::deleteColumn(size_t colIndex) {
+    if (colIndex >= cols) {
+        throw std::out_of_range("Column index out of range for deleteColumn.");
+    }
+    if (cols == 0) return; // Cannot delete from empty matrix (no columns)
+    for (size_t i = 0; i < rows; ++i) {
+        if (!data[i].empty()) { // Check if row itself is not empty
+            data[i].erase(data[i].begin() + colIndex);
+        }
+    }
+    cols--;
+    if (cols == 0) rows = 0; // If all columns deleted, it's an empty matrix
+}
+
+void Matrix::resize(size_t newRows, size_t newCols) {
+    // Adjust rows
+    if (newRows > rows) {
+        data.insert(data.end(), newRows - rows, std::vector<Fraction>(cols, Fraction(0)));
+    } else if (newRows < rows) {
+        data.erase(data.begin() + newRows, data.end());
+    }
+    rows = newRows;
+
+    // Adjust columns for all existing rows
+    for (size_t i = 0; i < rows; ++i) {
+        if (newCols > data[i].size()) {
+            data[i].insert(data[i].end(), newCols - data[i].size(), Fraction(0));
+        } else if (newCols < data[i].size()) {
+            data[i].erase(data[i].begin() + newCols, data[i].end());
+        }
+    }
+    cols = newCols;
+
+    if (rows == 0 || cols == 0) { // If either dimension is zero, it's effectively an empty matrix
+        data.clear();
+        if (rows == 0) cols = 0;
+        if (cols == 0) rows = 0;
+    }
 }

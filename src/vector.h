@@ -34,4 +34,6 @@ public:
     
     // 新增：向量归一化（返回单位向量）
     Vector normalize() const;
+
+    void resize(size_t newSize);
 };

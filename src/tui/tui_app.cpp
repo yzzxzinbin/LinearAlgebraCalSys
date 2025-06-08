@@ -1,11 +1,12 @@
 #include "tui_app.h"
-#include "tui_terminal.h" // KEY_... 常量现在从此头文件获得
+#include "tui_terminal.h" 
 #include <iostream>
 #include <string>
 #include <algorithm>
 #include "../utils/logger.h"
 #include "../grammar/grammar_tokenizer.h"
 #include "../grammar/grammar_parser.h"
+#include "enhanced_matrix_editor.h" // 已经在 tui_app.h 中包含
 
 // 新增：定义输出区域的布局常量
 const int RESULT_AREA_TITLE_ROW = 2; // "输出区域:" 标题所在的行 (0-indexed)
@@ -15,8 +16,9 @@ const int MATRIX_EDITOR_CELL_WIDTH = 8; // 矩阵编辑器单元格宽度
 TuiApp::TuiApp() 
     : historyIndex(0), running(true), 
       inStepDisplayMode(false), currentStep(0), totalSteps(0), isExpansionHistory(false),
-      cursorPosition(0), // 初始化光标位置
-      inMatrixEditMode(false), editCursorRow(0), editCursorCol(0), cellInputActive(false), // 初始化矩阵编辑模式状态
+      cursorPosition(0), 
+      // 初始化新的编辑器指针为空
+      matrixEditor(nullptr),
       stepDisplayStartRow(0) // 初始化步骤显示起始行
 {
     // 初始化终端以支持ANSI转义序列
@@ -50,13 +52,14 @@ void TuiApp::run()
     while (running)
     {
         // 更新UI
-        // 如果在矩阵编辑模式，则调用 drawMatrixEditor，否则调用 updateUI
-        if (inMatrixEditMode) {
-            drawMatrixEditor(); // 绘制编辑器界面
-            drawStatusBar();    // 状态栏仍然需要更新
+        if (matrixEditor) { // 如果增强型编辑器激活
+            matrixEditor->draw(); 
+            // 状态栏由编辑器或TuiApp更新
+            // drawStatusBar(); // 确保状态栏在编辑器绘制后更新，如果编辑器不自己画的话
         } else {
             updateUI();
         }
+        drawStatusBar(); // 总是绘制状态栏，确保它在最下面且最新
         
         // 确保UI更新立即显示
         std::cout.flush();
@@ -76,9 +79,12 @@ void TuiApp::initUI()
 {
     Terminal::clear();
     drawHeader();
-    drawInputPrompt();
+    // 如果编辑器激活，不绘制标准输入提示和结果区，由编辑器负责
+    if (!matrixEditor) {
+        drawInputPrompt();
+        drawResultArea(); 
+    }
     drawStatusBar();
-    drawResultArea(); // 这会调用 clearResultArea，进而设置 this->resultRow
 }
 
 void TuiApp::updateUI()
@@ -93,11 +99,12 @@ void TuiApp::updateUI()
         initUI();
     }
 
-    // 更新输入提示行
-    drawInputPrompt();
-
-    // 更新状态栏
-    drawStatusBar();
+    // 更新输入提示行 (仅当编辑器未激活时)
+    if (!matrixEditor) {
+        drawInputPrompt();
+    }
+    // 状态栏总是更新 (或者由编辑器更新自己的状态消息)
+    // drawStatusBar(); // 已移至run循环末尾
 }
 
 void TuiApp::handleInput()
@@ -105,7 +112,27 @@ void TuiApp::handleInput()
     // 读取一个字符
     int key = Terminal::readChar();
     
-    // 检查是否是退格键(包括Linux的127)
+    // 如果增强型编辑器激活，将输入传递给它
+    if (matrixEditor) {
+        EnhancedMatrixEditor::EditorResult result = matrixEditor->handleInput(key);
+        statusMessage = matrixEditor->getStatusMessage(); // 获取编辑器的状态消息
+
+        if (result == EnhancedMatrixEditor::EditorResult::EXIT_SAVE) {
+            interpreter.getVariablesNonConst()[matrixEditor->getVariableName()] = matrixEditor->getEditedVariableCopy();
+            statusMessage = "Changes saved to " + matrixEditor->getVariableName() + ". " + statusMessage;
+            matrixEditor.reset(); 
+            initUI(); // 重绘标准UI
+        } else if (result == EnhancedMatrixEditor::EditorResult::EXIT_DISCARD) {
+            // 当前 EXIT_DISCARD 未实现，ESC 默认为 EXIT_SAVE
+            statusMessage = "Exited editor for " + matrixEditor->getVariableName() + ". " + statusMessage;
+            matrixEditor.reset();
+            initUI();
+        }
+        // 如果是 CONTINUE 或 UPDATE_STATUS，状态栏会在 run() 循环中重绘
+        return;
+    }
+    
+    // 检查是否是退格键(包括Linux的127) - 仅当编辑器未激活
     if (key == KEY_BACKSPACE) {
         // 删除光标前一个字符
         if (cursorPosition > 0 && !currentInput.empty())
@@ -115,11 +142,6 @@ void TuiApp::handleInput()
             drawInputPrompt();
             std::cout.flush(); // 确保更新立即显示
         }
-        return;
-    }
-    
-    if (inMatrixEditMode) {
-        handleMatrixEditInput(key);
         return;
     }
 
@@ -267,6 +289,7 @@ void TuiApp::handleInput()
 }
 
 void TuiApp::printToResultView(const std::string& text, Color color) {
+    if (matrixEditor) return; // 不在编辑器模式下打印到主结果视图
     Terminal::setForeground(color);
     std::istringstream iss(text);
     std::string line;
@@ -318,8 +341,16 @@ void TuiApp::executeCommand(const std::string &input)
 
         LOG_INFO("执行命令: " + input);
 
-        // 1. 每次执行命令前先清除结果区域
-        clearResultArea(); // 这会将 resultRow 设置为 RESULT_AREA_CONTENT_START_ROW
+        // 1. 每次执行命令前先清除结果区域 (如果编辑器未激活)
+        if (!matrixEditor) {
+            clearResultArea(); 
+        } else {
+            // 如果编辑器激活时尝试执行命令（理论上不应发生，因为输入被编辑器捕获）
+            // 可能需要先退出编辑器
+            LOG_WARNING("Attempted to execute command while matrix editor is active.");
+            return;
+        }
+
 
         // 2. 总是先显示命令输入 (有且仅有这一次)
         Terminal::setCursor(resultRow, 0); 
@@ -353,15 +384,23 @@ void TuiApp::executeCommand(const std::string &input)
                 int dim = std::stoi(commandArgs[0]);
                 if (dim <= 0) throw std::invalid_argument("向量维度必须为正。");
                 std::string newName = generateNewVariableName(false);
-                interpreter.getVariablesNonConst()[newName] = Variable(Vector(dim)); // 使用 non-const 版本
-                enterMatrixEditMode(newName, true, false, dim, 1);
+                interpreter.getVariablesNonConst()[newName] = Variable(Vector(dim)); 
+                // 进入增强型编辑模式
+                Variable& varToEdit = interpreter.getVariablesNonConst().at(newName);
+                matrixEditor = std::make_unique<EnhancedMatrixEditor>(varToEdit, newName, false, terminalRows, terminalCols);
+                statusMessage = matrixEditor->getStatusMessage();
+                initUI(); // 重绘UI以适应编辑器
             } else if (commandArgs.size() == 2) { // new R C (matrix)
                 int r = std::stoi(commandArgs[0]);
                 int c = std::stoi(commandArgs[1]);
                 if (r <= 0 || c <= 0) throw std::invalid_argument("矩阵行列数必须为正。");
                 std::string newName = generateNewVariableName(true);
-                interpreter.getVariablesNonConst()[newName] = Variable(Matrix(r, c)); // 使用 non-const 版本
-                enterMatrixEditMode(newName, true, true, r, c);
+                interpreter.getVariablesNonConst()[newName] = Variable(Matrix(r, c)); 
+                // 进入增强型编辑模式
+                Variable& varToEdit = interpreter.getVariablesNonConst().at(newName);
+                matrixEditor = std::make_unique<EnhancedMatrixEditor>(varToEdit, newName, true, terminalRows, terminalCols);
+                statusMessage = matrixEditor->getStatusMessage();
+                initUI(); // 重绘UI以适应编辑器
             } else {
                 throw std::invalid_argument("new 命令参数错误。用法: new <维度> (用于向量) 或 new <行数> <列数> (用于矩阵)");
             }
@@ -374,11 +413,15 @@ void TuiApp::executeCommand(const std::string &input)
             if (interpreter.getVariables().find(varName) == interpreter.getVariables().end()) {
                 throw std::runtime_error("变量 '" + varName + "' 未定义。");
             }
-            const Variable& varToEdit = interpreter.getVariables().at(varName);
+            Variable& varToEdit = interpreter.getVariablesNonConst().at(varName); // 需要非const引用传递给编辑器
             if (varToEdit.type == VariableType::MATRIX) {
-                enterMatrixEditMode(varName, false, true, varToEdit.matrixValue.rowCount(), varToEdit.matrixValue.colCount());
+                matrixEditor = std::make_unique<EnhancedMatrixEditor>(varToEdit, varName, true, terminalRows, terminalCols);
+                statusMessage = matrixEditor->getStatusMessage();
+                initUI(); 
             } else if (varToEdit.type == VariableType::VECTOR) {
-                enterMatrixEditMode(varName, false, false, varToEdit.vectorValue.size(), 1);
+                matrixEditor = std::make_unique<EnhancedMatrixEditor>(varToEdit, varName, false, terminalRows, terminalCols);
+                statusMessage = matrixEditor->getStatusMessage();
+                initUI();
             } else {
                 throw std::runtime_error("变量 '" + varName + "' 不是矩阵或向量，无法编辑。");
             }
@@ -406,7 +449,7 @@ void TuiApp::executeCommand(const std::string &input)
 
             // 集成导入的历史记录
             // imported_cmds_from_file 是从文件中读取的顺序 (最新命令在前)
-            // 我们希望将它们按此顺序添加到历史记录的前面
+            // 我们希望將它们按此顺序添加到历史记录的前面
             // 因此，我们逆序遍历导入的命令 (从最旧的导入命令开始)
             // 并将它们 push_front 到 TuiApp 的 history 队列
             for (auto it = imported_cmds_from_file.rbegin(); it != imported_cmds_from_file.rend(); ++it) {
@@ -639,6 +682,7 @@ void TuiApp::executeCommand(const std::string &input)
 
 void TuiApp::showHelp()
 {
+    if (matrixEditor) return; // 不在编辑器模式下显示帮助
     // resultRow 当前指向命令行的下一行
     Terminal::setCursor(resultRow, 0); // 从 resultRow 开始打印帮助信息
     Terminal::setForeground(Color::CYAN);
@@ -761,6 +805,7 @@ void TuiApp::showHelp()
 
 void TuiApp::showVariables()
 {
+    if (matrixEditor) return; // 不在编辑器模式下显示变量
     // resultRow 当前指向命令行的下一行
     Terminal::setCursor(resultRow, 0);
     const auto &vars = interpreter.getVariables();
@@ -822,6 +867,7 @@ void TuiApp::showVariables()
 
 void TuiApp::handleSpecialKey(int key)
 {
+    if (matrixEditor) return; // 编辑器处理自己的特殊键
     switch (key)
     {
     case KEY_UP:
@@ -853,6 +899,7 @@ void TuiApp::handleSpecialKey(int key)
 
 void TuiApp::navigateHistory(bool up)
 {
+    if (matrixEditor) return; // 不在编辑器模式下导航历史
     if (up) { // 向上浏览历史
         if (history.empty()) {
             return;
@@ -902,6 +949,7 @@ void TuiApp::drawHeader()
 
 void TuiApp::drawInputPrompt()
 {
+    if (matrixEditor) return; // 编辑器激活时不绘制主输入提示
     Terminal::setCursor(inputRow, 0);
     Terminal::setForeground(Color::GREEN);
     std::cout << "> ";
@@ -959,6 +1007,7 @@ void TuiApp::drawStatusBar()
 // 添加新方法以清除结果区域
 void TuiApp::clearResultArea()
 {
+    if (matrixEditor) return; // 编辑器激活时，主结果区可能不需要清除或由编辑器管理
     // 清空结果区域的实际内容部分
     for (int i = RESULT_AREA_CONTENT_START_ROW; i < inputRow; i++)
     {
@@ -980,6 +1029,7 @@ void TuiApp::clearResultArea()
 // 添加新方法以显示特定变量的值
 void TuiApp::showVariable(const std::string &varName)
 {
+    if (matrixEditor) return; // 不在编辑器模式下显示变量
     const auto &vars = interpreter.getVariables();
     auto it = vars.find(varName);
 
@@ -1036,10 +1086,17 @@ void TuiApp::showVariable(const std::string &varName)
 
 void TuiApp::drawResultArea()
 {
+    if (matrixEditor) return; // 编辑器激活时不绘制主结果区
     clearResultArea(); // 这会重置 resultRow
 }
 // 进入步骤展示模式 - 操作历史版本
 void TuiApp::enterStepDisplayMode(const OperationHistory& history) {
+    if (matrixEditor) {
+        LOG_WARNING("Attempted to enter step display mode while editor is active. Exiting editor first.");
+        // Potentially save/discard editor changes here or prompt user
+        matrixEditor.reset(); // Forcibly exit editor
+        initUI();
+    }
     if (history.size() == 0) return;
     
     inStepDisplayMode = true;
@@ -1061,6 +1118,11 @@ void TuiApp::enterStepDisplayMode(const OperationHistory& history) {
 
 // 进入步骤展示模式 - 行列式展开版本
 void TuiApp::enterStepDisplayMode(const ExpansionHistory& history) {
+     if (matrixEditor) {
+        LOG_WARNING("Attempted to enter step display mode while editor is active. Exiting editor first.");
+        matrixEditor.reset(); 
+        initUI();
+    }
     if (history.size() == 0) return;
     
     inStepDisplayMode = true;
@@ -1090,7 +1152,7 @@ void TuiApp::exitStepDisplayMode() {
     drawStatusBar();
 }
 
-// 新增：矩阵编辑模式相关函数实现
+// 新增：矩阵编辑模式相关函数实现 - 这些将被移除或替换
 std::string TuiApp::generateNewVariableName(bool isMatrix) {
     const auto& vars = interpreter.getVariables();
     int i = 1;
@@ -1105,285 +1167,16 @@ std::string TuiApp::generateNewVariableName(bool isMatrix) {
     }
 }
 
-void TuiApp::enterMatrixEditMode(const std::string& varName, bool isNew, bool isMatrix, int rows, int cols) {
-    inMatrixEditMode = true;
-    editingVariableName = varName;
-    editingIsMatrix = isMatrix;
+// 移除旧的 enterMatrixEditMode, exitMatrixEditMode, drawMatrixEditor, handleMatrixEditInput
+// void TuiApp::enterMatrixEditMode(const std::string& varName, bool isNew, bool isMatrix, int rows, int cols) { ... }
+// void TuiApp::exitMatrixEditMode(bool saveChanges) { ... }
+// void TuiApp::drawMatrixEditor() { ... }
+// void TuiApp::handleMatrixEditInput(int key) { ... }
 
-    if (isNew) {
-        // 变量已在 executeCommand 中创建并加入 interpreter.variables
-        // editingVariableCopy 将从 interpreter 中获取最新的（刚创建的）
-    }
-    // 从解释器获取变量的副本进行编辑
-    editingVariableCopy = interpreter.getVariables().at(varName); // 读取时仍可用 const 版本
-
-
-    editCursorRow = 0;
-    editCursorCol = 0;
-    cellInputActive = false;
-    currentCellInput.clear();
-
-    clearResultArea(); // 清除主输出区域为编辑器腾出空间
-    // drawMatrixEditor(); // 将由主循环的 updateUI 部分调用
-    statusMessage = "矩阵编辑模式: 方向键移动, Enter编辑, ESC保存并退出";
-    // drawStatusBar(); // 将由主循环的 updateUI 部分调用
-}
-
-void TuiApp::exitMatrixEditMode(bool saveChanges) {
-    if (saveChanges) {
-        // 如果 cellInputActive，则先尝试保存当前单元格的输入
-        if (cellInputActive) {
-            try {
-                Fraction f_val;
-                std::string temp_input = currentCellInput;
-                if (temp_input.find('/') != std::string::npos) {
-                    size_t slash_pos = temp_input.find('/');
-                    long long num = std::stoll(temp_input.substr(0, slash_pos));
-                    long long den = std::stoll(temp_input.substr(slash_pos + 1));
-                    f_val = Fraction(num, den);
-                } else {
-                    f_val = Fraction(std::stoll(temp_input));
-                }
-
-                if (editingIsMatrix) {
-                    editingVariableCopy.matrixValue.at(editCursorRow, editCursorCol) = f_val;
-                } else { // Vector
-                    editingVariableCopy.vectorValue.at(editCursorRow) = f_val;
-                }
-            } catch (const std::exception& e) {
-                // 解析失败，忽略当前单元格的更改
-                LOG_WARNING("退出编辑模式时，当前单元格输入解析失败: " + currentCellInput + " - " + e.what());
-            }
-        }
-        // 将编辑后的副本保存回解释器
-        interpreter.getVariablesNonConst()[editingVariableName] = editingVariableCopy; // 使用 non-const 版本
-        statusMessage = "更改已保存到 " + editingVariableName;
-    } else {
-        statusMessage = "已退出编辑模式，更改未保存";
-    }
-
-    inMatrixEditMode = false;
-    cellInputActive = false;
-    currentCellInput.clear();
-    
-    initUI(); // 重绘标准UI
-}
-
-void TuiApp::drawMatrixEditor() {
-    // 清除编辑器区域 (标题行以下，输入行以上)
-    // RESULT_AREA_TITLE_ROW (e.g. 2) is "输出区域:"
-    // We can reuse this area.
-    for (int i = RESULT_AREA_CONTENT_START_ROW; i < inputRow; ++i) {
-        Terminal::setCursor(i, 0);
-        std::cout << std::string(terminalCols, ' ');
-    }
-
-    Terminal::setCursor(RESULT_AREA_TITLE_ROW, 0);
-    Terminal::setForeground(Color::YELLOW);
-    std::cout << "编辑 " << (editingIsMatrix ? "矩阵 " : "向量 ") << editingVariableName << ":" << std::endl;
-    Terminal::resetColor();
-
-    int displayStartRow = RESULT_AREA_CONTENT_START_ROW; // 内容从 "输出区域:" 下一行开始
-
-    size_t numRows = editingIsMatrix ? editingVariableCopy.matrixValue.rowCount() : editingVariableCopy.vectorValue.size();
-    size_t numCols = editingIsMatrix ? editingVariableCopy.matrixValue.colCount() : 1;
-
-    for (size_t r = 0; r < numRows; ++r) {
-        if (displayStartRow + (int)r >= inputRow) break; // 防止超出屏幕
-        Terminal::setCursor(displayStartRow + r, 1); // 留出左边距
-
-        if (editingIsMatrix) std::cout << "| ";
-
-        for (size_t c = 0; c < numCols; ++c) {
-            bool isSelectedCell = (r == editCursorRow && c == editCursorCol);
-            
-            if (isSelectedCell) {
-                Terminal::setBackground(Color::WHITE);
-                Terminal::setForeground(Color::BLACK);
-            } else {
-                Terminal::setForeground(Color::CYAN);
-            }
-
-            std::string cellStr;
-            if (isSelectedCell && cellInputActive) {
-                cellStr = currentCellInput;
-                // 添加一个闪烁光标的模拟，或仅显示输入
-                if (cellStr.length() < MATRIX_EDITOR_CELL_WIDTH) {
-                     cellStr += "_"; // 简单光标
-                }
-            } else {
-                Fraction val = editingIsMatrix ? editingVariableCopy.matrixValue.at(r, c) : editingVariableCopy.vectorValue.at(r);
-                std::ostringstream oss;
-                oss << val;
-                cellStr = oss.str();
-            }
-
-            // 格式化输出以适应单元格宽度
-            if (cellStr.length() > MATRIX_EDITOR_CELL_WIDTH) {
-                std::cout << cellStr.substr(0, MATRIX_EDITOR_CELL_WIDTH);
-            } else {
-                std::cout << cellStr;
-                for (size_t pad = cellStr.length(); pad < MATRIX_EDITOR_CELL_WIDTH; ++pad) {
-                    std::cout << " ";
-                }
-            }
-            
-            if (isSelectedCell) {
-                Terminal::resetColor(); // 重置高亮单元格的颜色
-            }
-             Terminal::setForeground(Color::CYAN); // 确保后续分隔符颜色正确
-            if (editingIsMatrix && c < numCols -1) std::cout << " "; // 列间距
-        }
-        if (editingIsMatrix) std::cout << " |";
-        Terminal::resetColor(); // 重置行末颜色
-    }
-}
-
-
-void TuiApp::handleMatrixEditInput(int key) {
-    size_t maxRows = editingIsMatrix ? editingVariableCopy.matrixValue.rowCount() : editingVariableCopy.vectorValue.size();
-    size_t maxCols = editingIsMatrix ? editingVariableCopy.matrixValue.colCount() : 1;
-
-    if (cellInputActive) {
-        switch (key) {
-            case KEY_ENTER: {
-                try {
-                    Fraction f_val;
-                    if (currentCellInput.empty()) { // 如果为空，则视为0
-                        f_val = Fraction(0);
-                    } else if (currentCellInput.find('/') != std::string::npos) {
-                        size_t slash_pos = currentCellInput.find('/');
-                        long long num = std::stoll(currentCellInput.substr(0, slash_pos));
-                        long long den = std::stoll(currentCellInput.substr(slash_pos + 1));
-                        if (den == 0) throw std::invalid_argument("分母不能为零");
-                        f_val = Fraction(num, den);
-                    } else {
-                        f_val = Fraction(std::stoll(currentCellInput));
-                    }
-
-                    if (editingIsMatrix) {
-                        editingVariableCopy.matrixValue.at(editCursorRow, editCursorCol) = f_val;
-                    } else { // Vector
-                        editingVariableCopy.vectorValue.at(editCursorRow) = f_val;
-                    }
-                } catch (const std::exception& e) {
-                    statusMessage = "错误: 无效的分数格式 - " + std::string(e.what());
-                    return; 
-                }
-                cellInputActive = false;
-                currentCellInput.clear();
-                statusMessage = "矩阵编辑模式: 方向键移动, Enter编辑, ESC保存并退出";
-                break;
-            }
-            case KEY_ESCAPE:
-                cellInputActive = false;
-                currentCellInput.clear(); // 取消编辑，清除当前输入
-                statusMessage = "矩阵编辑模式: 方向键移动, Enter编辑, ESC保存并退出";
-                break;
-            case KEY_BACKSPACE:
-                if (!currentCellInput.empty()) {
-                    currentCellInput.pop_back();
-                }
-                break;
-            case KEY_UP:
-            case KEY_DOWN:
-            case KEY_LEFT:
-            case KEY_RIGHT: {
-                bool errorOccurred = false;
-                if (!currentCellInput.empty()) {
-                    try {
-                        Fraction f_val;
-                        if (currentCellInput.find('/') != std::string::npos) {
-                            size_t slash_pos = currentCellInput.find('/');
-                            long long num = std::stoll(currentCellInput.substr(0, slash_pos));
-                            long long den = std::stoll(currentCellInput.substr(slash_pos + 1));
-                            if (den == 0) throw std::invalid_argument("分母不能为零");
-                            f_val = Fraction(num, den);
-                        } else {
-                            f_val = Fraction(std::stoll(currentCellInput));
-                        }
-
-                        if (editingIsMatrix) {
-                            editingVariableCopy.matrixValue.at(editCursorRow, editCursorCol) = f_val;
-                        } else { // Vector
-                            editingVariableCopy.vectorValue.at(editCursorRow) = f_val;
-                        }
-                    } catch (const std::exception& e) {
-                        statusMessage = "错误: 无效输入 '" + currentCellInput + "', 未保存。";
-                        errorOccurred = true;
-                    }
-                }
-                // If currentCellInput was empty, or parsing failed, editingVariableCopy.at(row,col) is not changed by this attempt.
-
-                cellInputActive = false;
-                currentCellInput.clear();
-                
-                if (!errorOccurred) {
-                    statusMessage = "矩阵编辑模式: 方向键移动, Enter编辑, ESC保存并退出";
-                }
-
-                // Perform navigation
-                if (key == KEY_UP) {
-                    if (editCursorRow > 0) editCursorRow--;
-                } else if (key == KEY_DOWN) {
-                    if (editCursorRow < maxRows - 1) editCursorRow++;
-                } else if (key == KEY_LEFT) {
-                    if (editCursorCol > 0) editCursorCol--;
-                } else if (key == KEY_RIGHT) {
-                    if (editCursorCol < maxCols - 1) editCursorCol++;
-                }
-                return; // Key handled
-            }
-            default:
-                if (key >= 32 && key <= 126) { 
-                    if (currentCellInput.length() < MATRIX_EDITOR_CELL_WIDTH -1 ) { 
-                        if (std::isdigit(key) || key == '/' || key == '-' || 
-                            (key == '.' && currentCellInput.find('.') == std::string::npos) ) { 
-                            currentCellInput += static_cast<char>(key);
-                        }
-                    }
-                }
-                break;
-        }
-    } else { // Navigation mode (cellInputActive is false)
-        switch (key) {
-            case KEY_UP:
-                if (editCursorRow > 0) editCursorRow--;
-                break;
-            case KEY_DOWN:
-                if (editCursorRow < maxRows - 1) editCursorRow++;
-                break;
-            case KEY_LEFT:
-                if (editCursorCol > 0) editCursorCol--;
-                break;
-            case KEY_RIGHT:
-                if (editCursorCol < maxCols - 1) editCursorCol++;
-                break;
-            case KEY_ENTER: {
-                cellInputActive = true;
-                Fraction val = editingIsMatrix ? editingVariableCopy.matrixValue.at(editCursorRow, editCursorCol) : editingVariableCopy.vectorValue.at(editCursorRow);
-                std::ostringstream oss;
-                oss << val;
-                currentCellInput = oss.str(); // Populate with current cell value for editing
-                statusMessage = "编辑单元格 (" + std::to_string(editCursorRow+1) + "," + std::to_string(editCursorCol+1) + "): Enter确认, ESC取消, 方向键保存并移动";
-                break;
-            }
-            case KEY_ESCAPE:
-                exitMatrixEditMode(true); 
-                return; 
-            default:
-                if (std::isdigit(key) || key == '-') { // Start editing directly if a number or minus is pressed
-                    cellInputActive = true;
-                    currentCellInput = static_cast<char>(key);
-                    statusMessage = "编辑单元格 (" + std::to_string(editCursorRow+1) + "," + std::to_string(editCursorCol+1) + "): Enter确认, ESC取消, 方向键保存并移动";
-                }
-                break;
-        }
-    }
-}
 
 // 显示当前步骤
 void TuiApp::displayCurrentStep() {
+    if (matrixEditor) return; // 不在编辑器模式下显示步骤
     // 清除旧的步骤内容区域 (从 stepDisplayStartRow 开始，直到进度条之前)
     // 进度条在 inputRow - 2, 进度条上的数字在 inputRow - 3
     // 所以步骤内容区域最多到 inputRow - 4
@@ -1431,6 +1224,7 @@ void TuiApp::displayCurrentStep() {
 
 // 绘制步骤进度条
 void TuiApp::drawStepProgressBar() {
+    if (matrixEditor) return; // 不在编辑器模式下绘制进度条
     // 计算进度条位置
     int barRow = inputRow - 2;
     int barWidth = terminalCols - 10; // 留出左右边距

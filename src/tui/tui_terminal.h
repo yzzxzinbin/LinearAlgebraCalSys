@@ -15,6 +15,15 @@ const int KEY_DOWN = 257;
 const int KEY_LEFT = 258;
 const int KEY_RIGHT = 259;
 
+// 新增：用于增强型编辑器模式的组合键 (这些值的实际检测依赖于 Terminal::readChar 实现)
+const int KEY_CTRL_ENTER = 0x1000; 
+const int KEY_CTRL_UP    = 0x1001; 
+const int KEY_CTRL_DOWN  = 0x1002; 
+const int KEY_CTRL_LEFT  = 0x1003; 
+const int KEY_CTRL_RIGHT = 0x1004; 
+// KEY_DELETE is already defined, ensure Terminal::readChar() can return it.
+
+
 // 终端颜色
 enum class Color {
     BLACK,

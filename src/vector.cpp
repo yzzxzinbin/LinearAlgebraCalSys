@@ -112,3 +112,7 @@ Vector Vector::normalize() const {
     }
     return result;
 }
+
+void Vector::resize(size_t newSize) {
+    data.resize(newSize);
+}
