@@ -3,7 +3,6 @@
 #include <iostream>
 #include <string>
 #include <algorithm>
-#include <windows.h>
 #include "../utils/logger.h"
 #include "../grammar/grammar_tokenizer.h"
 #include "../grammar/grammar_parser.h"
@@ -58,6 +57,9 @@ void TuiApp::run()
         } else {
             updateUI();
         }
+        
+        // 确保UI更新立即显示
+        std::cout.flush();
 
         // 处理输入
         handleInput();
@@ -102,7 +104,20 @@ void TuiApp::handleInput()
 {
     // 读取一个字符
     int key = Terminal::readChar();
-
+    
+    // 检查是否是退格键(包括Linux的127)
+    if (key == KEY_BACKSPACE) {
+        // 删除光标前一个字符
+        if (cursorPosition > 0 && !currentInput.empty())
+        {
+            currentInput.erase(cursorPosition - 1, 1);
+            cursorPosition--;
+            drawInputPrompt();
+            std::cout.flush(); // 确保更新立即显示
+        }
+        return;
+    }
+    
     if (inMatrixEditMode) {
         handleMatrixEditInput(key);
         return;

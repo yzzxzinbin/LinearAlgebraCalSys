@@ -143,7 +143,17 @@ void Terminal::setRawMode(bool enable) {
     if (enable) {
         tcgetattr(STDIN_FILENO, &oldTermios);
         newTermios = oldTermios;
-        newTermios.c_lflag &= ~(ICANON | ECHO);
+        
+        // 禁用标准输入处理
+        newTermios.c_lflag &= ~(ICANON | ECHO | ISIG | IEXTEN);
+        
+        // 禁用软件流控制
+        newTermios.c_iflag &= ~(IXON | IXOFF | ICRNL | INLCR | IGNCR);
+        
+        // 设置输入模式
+        newTermios.c_cc[VMIN] = 1;  // 最少读取一个字符
+        newTermios.c_cc[VTIME] = 0; // 不设置超时
+        
         tcsetattr(STDIN_FILENO, TCSANOW, &newTermios);
     } else {
         tcsetattr(STDIN_FILENO, TCSANOW, &oldTermios);
@@ -169,8 +179,53 @@ int Terminal::readChar() {
     }
     return c; // 普通键
 #else
-    char c_val;
+    unsigned char c_val;
     if (read(STDIN_FILENO, &c_val, 1) == 1) {
+        // 处理ANSI转义序列
+        if (c_val == 27) { // ESC字符
+            // 检查是否是转义序列的一部分
+            fd_set readfds;
+            struct timeval timeout;
+            
+            FD_ZERO(&readfds);
+            FD_SET(STDIN_FILENO, &readfds);
+            timeout.tv_sec = 0;
+            timeout.tv_usec = 100000; // 100ms超时
+            
+            // 检查是否有更多字符可读（转义序列的其余部分）
+            if (select(STDIN_FILENO + 1, &readfds, NULL, NULL, &timeout) > 0) {
+                unsigned char next;
+                if (read(STDIN_FILENO, &next, 1) == 1) {
+                    if (next == '[') { // ESC [ 序列
+                        unsigned char code;
+                        if (read(STDIN_FILENO, &code, 1) == 1) {
+                            switch (code) {
+                                case 'A': return KEY_UP;    // 上箭头
+                                case 'B': return KEY_DOWN;  // 下箭头
+                                case 'C': return KEY_RIGHT; // 右箭头
+                                case 'D': return KEY_LEFT;  // 左箭头
+                                case '3': // 可能是Delete键 (ESC [ 3 ~)
+                                    if (read(STDIN_FILENO, &code, 1) == 1 && code == '~') {
+                                        return KEY_DELETE;
+                                    }
+                                    break;
+                            }
+                        }
+                    }
+                }
+                // 如果无法识别完整序列，返回ESC
+                return KEY_ESCAPE;
+            } else {
+                // 如果没有后续字符，这只是一个单独的ESC键
+                return KEY_ESCAPE;
+            }
+        }
+        
+        // 在Linux上，将DELETE键(127)作为退格键处理
+        if (c_val == 127) {
+            return KEY_BACKSPACE;
+        }
+        
         return (int)c_val;
     }
     return -1; // 读取错误

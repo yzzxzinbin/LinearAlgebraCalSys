@@ -2,6 +2,7 @@
 #include <vector>
 #include <iostream>
 #include <cmath>
+#include <sstream>
 #include "fraction.h"
 
 class Vector {

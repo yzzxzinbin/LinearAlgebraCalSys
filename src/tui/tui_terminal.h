@@ -8,8 +8,8 @@
 const int KEY_ENTER = 13;
 const int KEY_ESCAPE = 27;
 const int KEY_BACKSPACE = 8;
-// const int KEY_DELETE = 127; // _getch() for delete is 224, 83. If needed, map this in readChar.
-// Current KEY_DELETE value 127 is for ASCII DEL.
+const int KEY_DELETE = 127; // Linux系统通常使用127作为退格键(Backspace)
+// 保持原有的特殊键值定义
 const int KEY_UP = 256;
 const int KEY_DOWN = 257;
 const int KEY_LEFT = 258;
