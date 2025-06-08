@@ -171,6 +171,11 @@ int Terminal::readChar() {
         return KEY_CTRL_ENTER;
     }
     
+    // 检测CTRL+A (新增)
+    if ((c == 'a' || c == 'A' || c == 1) && (GetAsyncKeyState(VK_CONTROL) & 0x8000)) {
+        return KEY_CTRL_A;
+    }
+    
     // 处理特殊键前缀
     if (c == 0 || c == 224) {
         int scancode = _getch();

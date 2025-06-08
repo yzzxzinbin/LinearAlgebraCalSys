@@ -119,12 +119,12 @@ void TuiApp::handleInput()
 
         if (result == EnhancedMatrixEditor::EditorResult::EXIT_SAVE) {
             interpreter.getVariablesNonConst()[matrixEditor->getVariableName()] = matrixEditor->getEditedVariableCopy();
-            statusMessage = "Changes saved to " + matrixEditor->getVariableName() + ". " + statusMessage;
+            statusMessage = "数据更改已生效于 " + matrixEditor->getVariableName() ;
             matrixEditor.reset(); 
             initUI(); // 重绘标准UI
         } else if (result == EnhancedMatrixEditor::EditorResult::EXIT_DISCARD) {
             // 当前 EXIT_DISCARD 未实现，ESC 默认为 EXIT_SAVE
-            statusMessage = "Exited editor for " + matrixEditor->getVariableName() + ". " + statusMessage;
+            statusMessage = "已退出 " + matrixEditor->getVariableName() + " 的编辑器";
             matrixEditor.reset();
             initUI();
         }

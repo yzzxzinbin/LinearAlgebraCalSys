@@ -8,6 +8,13 @@ EnhancedMatrixEditor::EnhancedMatrixEditor(Variable& var, std::string varName, b
       cursorRow(0), cursorCol(0), cellInputActive(false),
       cursorOnAddRow(false), cursorOnAddCol(false),
       terminalRows(termRows), terminalCols(termCols) {
+    
+    // 修改：如果矩阵/向量为空，默认选中添加行按钮
+    if ((isMatrix && workingCopy.matrixValue.rowCount() == 0 && workingCopy.matrixValue.colCount() == 0) ||
+        (!isMatrix && workingCopy.vectorValue.size() == 0)) {
+        cursorOnAddRow = true;
+    }
+    
     updateStatus("编辑模式：方向键移动，直接输入数字修改，CTRL+回车选择，ESC保存退出");
 }
 
@@ -20,6 +27,9 @@ void EnhancedMatrixEditor::updateStatus(const std::string& msg) {
 EnhancedMatrixEditor::EditorResult EnhancedMatrixEditor::handleInput(int key) {
     size_t numRows = isMatrix ? workingCopy.matrixValue.rowCount() : workingCopy.vectorValue.size();
     size_t numCols = isMatrix ? workingCopy.matrixValue.colCount() : 1;
+    
+    // 检测是否为空矩阵/向量
+    bool isEmpty = (numRows == 0 || (isMatrix && numCols == 0));
 
     // 添加调试代码，帮助识别键码
     if (key > 1000) {
@@ -37,6 +47,17 @@ EnhancedMatrixEditor::EditorResult EnhancedMatrixEditor::handleInput(int key) {
                 sharedInputBuffer.clear();
             }
             
+            // 特殊处理空矩阵情况
+            if (isEmpty && isMatrix) {
+                // 在空矩阵的情况下，允许在添加行和添加列按钮之间切换
+                if (cursorOnAddCol) {
+                    cursorOnAddCol = false;
+                    cursorOnAddRow = true;
+                }
+                return EditorResult::CONTINUE;
+            }
+            
+            // 原有逻辑
             if (cursorOnAddRow) {
                 cursorOnAddRow = false;
                 cursorRow = numRows > 0 ? numRows - 1 : 0;
@@ -53,6 +74,17 @@ EnhancedMatrixEditor::EditorResult EnhancedMatrixEditor::handleInput(int key) {
                 sharedInputBuffer.clear();
             }
             
+            // 特殊处理空矩阵情况
+            if (isEmpty && isMatrix) {
+                // 在空矩阵的情况下，允许在添加行和添加列按钮之间切换
+                if (cursorOnAddRow) {
+                    cursorOnAddRow = false;
+                    cursorOnAddCol = true;
+                }
+                return EditorResult::CONTINUE;
+            }
+            
+            // 原有逻辑
             if (cursorRow < (numRows > 0 ? numRows - 1 : 0)) {
                 cursorRow++;
             } else if (!cursorOnAddRow && numRows > 0) {
@@ -69,6 +101,17 @@ EnhancedMatrixEditor::EditorResult EnhancedMatrixEditor::handleInput(int key) {
                 sharedInputBuffer.clear();
             }
             
+            // 特殊处理空矩阵情况
+            if (isEmpty && isMatrix) {
+                // 在空矩阵的情况下，允许在添加行和添加列按钮之间切换
+                if (cursorOnAddCol) {
+                    cursorOnAddCol = false;
+                    cursorOnAddRow = true;
+                }
+                return EditorResult::CONTINUE;
+            }
+            
+            // 原有逻辑
             if (cursorOnAddCol) {
                 cursorOnAddCol = false;
                 cursorCol = numCols > 0 ? numCols - 1 : 0;
@@ -85,6 +128,17 @@ EnhancedMatrixEditor::EditorResult EnhancedMatrixEditor::handleInput(int key) {
                 sharedInputBuffer.clear();
             }
             
+            // 特殊处理空矩阵情况
+            if (isEmpty && isMatrix) {
+                // 在空矩阵的情况下，允许在添加行和添加列按钮之间切换
+                if (cursorOnAddRow) {
+                    cursorOnAddRow = false;
+                    cursorOnAddCol = true;
+                }
+                return EditorResult::CONTINUE;
+            }
+            
+            // 原有逻辑
             if (cursorCol < (numCols > 0 ? numCols - 1 : 0)) {
                 cursorCol++;
             } else if (isMatrix && !cursorOnAddCol && numCols > 0) {
@@ -112,17 +166,25 @@ EnhancedMatrixEditor::EditorResult EnhancedMatrixEditor::handleInput(int key) {
             } else if (cursorOnAddCol) {
                 addColumnAction();
                 draw(true); // 结构变化，需要完整重绘
+                
+                // 添加调试信息，帮助确认状态
+                std::ostringstream debug_msg;
+                debug_msg << "矩阵大小更新为 " << workingCopy.matrixValue.rowCount() << "x" 
+                         << workingCopy.matrixValue.colCount() << ", 光标位置: [" 
+                         << cursorRow << "," << cursorCol << "]";
+                updateStatus(debug_msg.str());
+                
                 return EditorResult::UPDATE_STATUS;
             } else if (!selectedCells.empty()) {
                 // 如果有批量选择且有输入，应用输入
                 if (!sharedInputBuffer.empty() && cellInputActive) {
                     applySharedInputBuffer();
-                    sharedInputBuffer.clear();
-                    cellInputActive = false;
-                    updateStatus("批量单元格值已设置");
+                    // 修改：应用输入后清除所有选择，而不只是关闭输入模式
+                    clearSelectionsAndInput(); // 这会同时清除选择和输入缓冲区，并设置cellInputActive=false
+                    updateStatus("批量单元格值已设置并清除选择");
                     return EditorResult::UPDATE_STATUS;
                 }
-                // 否则清除选择
+                // 如果没有输入，则只清除选择
                 clearSelectionsAndInput();
                 updateStatus("选择已清除");
                 return EditorResult::UPDATE_STATUS;
@@ -207,7 +269,7 @@ EnhancedMatrixEditor::EditorResult EnhancedMatrixEditor::handleInput(int key) {
                 
                 selectRow(cursorRow);
                 updateStatus("行选择已" + std::string(isFullRowSelected(cursorRow) ? "启用" : "取消"));
-                return EditorResult::UPDATE_STATUS;
+                return EditorResult::CONTINUE;
             }
             return EditorResult::CONTINUE;
 
@@ -238,6 +300,14 @@ EnhancedMatrixEditor::EditorResult EnhancedMatrixEditor::handleInput(int key) {
             if (!sharedInputBuffer.empty()) {
                 sharedInputBuffer.pop_back();
                 return EditorResult::CONTINUE;
+            }
+            return EditorResult::CONTINUE;
+
+        case KEY_CTRL_A:
+            // 全选所有单元格
+            if (!cursorOnAddRow && !cursorOnAddCol && numRows > cursorRow && (isMatrix ? numCols > cursorCol : true)) {
+                selectAllCells();
+                return EditorResult::UPDATE_STATUS;
             }
             return EditorResult::CONTINUE;
     }
@@ -287,6 +357,18 @@ void EnhancedMatrixEditor::drawGrid() {
     int displayStartRow = 3; 
     size_t numRows = isMatrix ? workingCopy.matrixValue.rowCount() : workingCopy.vectorValue.size();
     size_t numCols = isMatrix ? workingCopy.matrixValue.colCount() : 1;
+
+    // 特殊处理：如果是矩阵且有行但没有列，仍然绘制行边框
+    if (isMatrix && numRows > 0 && numCols == 0) {
+        for (size_t r = 0; r < numRows; ++r) {
+            if (displayStartRow + (int)r >= terminalRows - 2) break;
+            Terminal::setCursor(displayStartRow + r, 1);
+            Terminal::setForeground(Color::CYAN);
+            std::cout << "| |"; // 显示空行
+            Terminal::resetColor();
+        }
+        return;
+    }
 
     for (size_t r = 0; r < numRows; ++r) {
         if (displayStartRow + (int)r >= terminalRows - 2) break; 
@@ -342,30 +424,54 @@ void EnhancedMatrixEditor::drawAddControls() {
     int displayStartRow = 3;
     size_t numRows = isMatrix ? workingCopy.matrixValue.rowCount() : workingCopy.vectorValue.size();
     size_t numCols = isMatrix ? workingCopy.matrixValue.colCount() : 1;
+    
+    // 更精确地判断空矩阵状态
+    bool isReallyEmpty = (numRows == 0 && numCols == 0) || 
+                        (isMatrix && (numRows == 0 || numCols == 0));
 
-    if (displayStartRow + numRows < terminalRows - 3) { // Ensure space for '+' and status bar
-        int addRowColPos = 1 + (isMatrix ? 2 : 0) + (numCols * (EDITOR_CELL_WIDTH + (isMatrix ? 1 : 0)) -1 ) / 2;
-        if (numCols == 0 && isMatrix) addRowColPos = 1 + 2; // Case for 0-col matrix
-        else if (numCols == 0 && !isMatrix) addRowColPos = 1; // Case for 0-element vector
-
+    // 绘制添加行按钮
+    int addRowColPos = isReallyEmpty ? 4 : 
+               (1 + (isMatrix ? 2 : 0) + (numCols * (EDITOR_CELL_WIDTH + (isMatrix ? 1 : 0)) - 1) / 2);
+    
+    if (displayStartRow + numRows < terminalRows - 3) {
         Terminal::setCursor(displayStartRow + numRows, addRowColPos);
-        if (cursorOnAddRow) { Terminal::setBackground(Color::GREEN); Terminal::setForeground(Color::BLACK); }
-        else { Terminal::setForeground(Color::YELLOW); }
+        if (cursorOnAddRow) { 
+            Terminal::setBackground(Color::GREEN); 
+            Terminal::setForeground(Color::BLACK); 
+        } else { 
+            Terminal::setForeground(Color::YELLOW); 
+        }
         std::cout << "+";
         Terminal::resetColor();
+        
+        // 在按钮旁边添加提示文本
+        if (isReallyEmpty) {
+            std::cout << " 添加行";
+        }
     }
 
+    // 对于矩阵，绘制添加列按钮
     if (isMatrix) {
-        int addColRowPos = displayStartRow + (numRows > 0 ? numRows / 2 : 0) ;
-        int addColColPos = 1 + (isMatrix ? 2 : 0) + numCols * (EDITOR_CELL_WIDTH + 1) + (isMatrix ? 2 : 0);
-         if (numRows == 0) addColRowPos = displayStartRow; // Case for 0-row matrix
+        int addColRowPos = isReallyEmpty ? displayStartRow : 
+                         (displayStartRow + (numRows > 0 ? numRows / 2 : 0));
+        int addColColPos = isReallyEmpty ? 15 : 
+                         (1 + (isMatrix ? 2 : 0) + numCols * (EDITOR_CELL_WIDTH + 1) + (isMatrix ? 2 : 0));
 
-        if (addColColPos < terminalCols -1 && displayStartRow + (numRows > 0 ? numRows/2 : 0) < terminalRows -3) {
+        if (addColColPos < terminalCols - 1 && addColRowPos < terminalRows - 3) {
             Terminal::setCursor(addColRowPos, addColColPos);
-            if (cursorOnAddCol) { Terminal::setBackground(Color::GREEN); Terminal::setForeground(Color::BLACK); }
-            else { Terminal::setForeground(Color::YELLOW); }
+            if (cursorOnAddCol) {
+                Terminal::setBackground(Color::GREEN);
+                Terminal::setForeground(Color::BLACK);
+            } else {
+                Terminal::setForeground(Color::YELLOW);
+            }
             std::cout << "+";
             Terminal::resetColor();
+            
+            // 在按钮旁边添加提示文本
+            if (isReallyEmpty) {
+                std::cout << " 添加列";
+            }
         }
     }
 }
@@ -429,15 +535,17 @@ void EnhancedMatrixEditor::selectRow(size_t r) {
         else selectedCells.insert({r, c});
     }
 
-    // 修改点：如果选择了行，自动激活输入模式；如果取消选择，关闭输入模式
-    if (!currently_selected && !selectedCells.empty()) {
+    // 修改：如果选择了行，自动激活输入模式；如果取消选择，只有在没有其他选中单元格时才关闭输入模式
+    if (!currently_selected) {
         cellInputActive = true;
         sharedInputBuffer.clear();
         updateStatus("已选择行，可直接输入值应用到所有选定单元格");
-    } else if (currently_selected) {
+    } else if (selectedCells.empty()) { // 只有在没有选中单元格时才关闭输入模式
         cellInputActive = false;
         sharedInputBuffer.clear();
-        updateStatus("行选择已取消");
+        updateStatus("所有选择已取消");
+    } else {
+        updateStatus("行选择已取消，仍有" + std::to_string(selectedCells.size()) + "个单元格被选中");
     }
 }
 
@@ -452,21 +560,58 @@ void EnhancedMatrixEditor::selectColumn(size_t c) {
         else selectedCells.insert({r, c});
     }
 
-    // 修改点：如果选择了列，自动激活输入模式；如果取消选择，关闭输入模式
-    if (!currently_selected && !selectedCells.empty()) {
+    // 修改：如果选择了列，自动激活输入模式；如果取消选择，只有在没有其他选中单元格时才关闭输入模式
+    if (!currently_selected) {
         cellInputActive = true;
         sharedInputBuffer.clear();
         updateStatus("已选择列，可直接输入值应用到所有选定单元格");
-    } else if (currently_selected) {
+    } else if (selectedCells.empty()) { // 只有在没有选中单元格时才关闭输入模式
         cellInputActive = false;
         sharedInputBuffer.clear();
-        updateStatus("列选择已取消");
+        updateStatus("所有选择已取消");
+    } else {
+        updateStatus("列选择已取消，仍有" + std::to_string(selectedCells.size()) + "个单元格被选中");
+    }
+}
+
+void EnhancedMatrixEditor::selectAllCells() {
+    size_t numRows = isMatrix ? workingCopy.matrixValue.rowCount() : workingCopy.vectorValue.size();
+    size_t numCols = isMatrix ? workingCopy.matrixValue.colCount() : 1;
+    
+    if (numRows == 0 || (isMatrix && numCols == 0)) {
+        updateStatus("矩阵/向量为空，无法选择");
+        return; // 空矩阵或向量，无法选择
+    }
+    
+    // 先检查是否已全选，如果是则取消全选
+    bool allSelected = (selectedCells.size() == numRows * numCols);
+    
+    if (allSelected) {
+        clearSelectionsAndInput();
+        updateStatus("已取消全选");
+    } else {
+        // 选择所有单元格
+        selectedCells.clear();
+        for (size_t r = 0; r < numRows; ++r) {
+            for (size_t c = 0; c < numCols; ++c) {
+                selectedCells.insert({r, c});
+            }
+        }
+        cellInputActive = true;
+        updateStatus("已全选单元格，输入值将应用到所有单元格");
     }
 }
 
 void EnhancedMatrixEditor::addRowAction() {
     if (isMatrix) {
-        workingCopy.matrixValue.addRow(workingCopy.matrixValue.rowCount()); 
+        // 如果是空矩阵（0行0列），添加行的同时也添加一列
+        // 否则无法编辑添加的行
+        if (workingCopy.matrixValue.rowCount() == 0 && workingCopy.matrixValue.colCount() == 0) {
+            workingCopy.matrixValue.addRow(0);
+            workingCopy.matrixValue.addColumn(0);
+        } else {
+            workingCopy.matrixValue.addRow(workingCopy.matrixValue.rowCount());
+        }
     } else { 
         workingCopy.vectorValue.resize(workingCopy.vectorValue.size() + 1); 
     }
@@ -479,12 +624,23 @@ void EnhancedMatrixEditor::addRowAction() {
 
 void EnhancedMatrixEditor::addColumnAction() {
     if (!isMatrix) return;
-    workingCopy.matrixValue.addColumn(workingCopy.matrixValue.colCount()); 
-    cursorOnAddCol = false; 
+    
+    // 如果是空矩阵（0行0列），添加列的同时也添加一行
+    // 否则没有行就无法显示添加的列
+    if (workingCopy.matrixValue.rowCount() == 0 && workingCopy.matrixValue.colCount() == 0) {
+        workingCopy.matrixValue.addRow(0);
+        workingCopy.matrixValue.addColumn(0);
+    } else {
+        workingCopy.matrixValue.addColumn(workingCopy.matrixValue.colCount());
+    }
+    
+    cursorOnAddCol = false;
+    cursorOnAddRow = false;
     cursorCol = workingCopy.matrixValue.colCount() - 1;
     cursorRow = 0;
+    
+    // 在添加列后强制刷新UI状态
     updateStatus("已添加新列");
-    // 不在这里调用draw，由handleInput负责调用
 }
 
 void EnhancedMatrixEditor::deleteSelectedRowsAction() {
@@ -499,6 +655,15 @@ void EnhancedMatrixEditor::deleteSelectedRowsAction() {
              workingCopy.matrixValue.deleteRow(r_idx);
         }
     }
+    
+    // 删除后，如果矩阵变为空，设置光标到添加行按钮
+    if (workingCopy.matrixValue.rowCount() == 0) {
+        cursorOnAddRow = true;
+        cursorOnAddCol = false;
+        cursorRow = 0;
+        cursorCol = 0;
+    }
+    
     if (!rows_to_delete.empty()) {
         clearSelectionsAndInput();
         updateStatus(std::to_string(rows_to_delete.size()) + " 行已删除");
@@ -517,6 +682,15 @@ void EnhancedMatrixEditor::deleteSelectedColumnsAction() {
             workingCopy.matrixValue.deleteColumn(c_idx);
         }
     }
+    
+    // 删除后，如果矩阵变为空，设置光标到添加行按钮
+    if (workingCopy.matrixValue.colCount() == 0) {
+        cursorOnAddRow = true;
+        cursorOnAddCol = false;
+        cursorRow = 0;
+        cursorCol = 0;
+    }
+    
     if (!cols_to_delete.empty()) {
         clearSelectionsAndInput();
         updateStatus(std::to_string(cols_to_delete.size()) + " 列已删除");

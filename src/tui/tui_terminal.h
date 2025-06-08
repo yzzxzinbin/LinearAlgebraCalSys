@@ -21,6 +21,7 @@ const int KEY_CTRL_UP    = 0x1001;
 const int KEY_CTRL_DOWN  = 0x1002; 
 const int KEY_CTRL_LEFT  = 0x1003; 
 const int KEY_CTRL_RIGHT = 0x1004; 
+const int KEY_CTRL_A     = 0x1005; // 新增：CTRL+A全选
 // KEY_DELETE is already defined, ensure Terminal::readChar() can return it.
 
 

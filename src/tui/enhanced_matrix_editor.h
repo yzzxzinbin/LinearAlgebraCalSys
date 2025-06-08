@@ -51,6 +51,7 @@ private:
     void toggleCellSelection(size_t r, size_t c);
     void selectRow(size_t r);
     void selectColumn(size_t c);
+    void selectAllCells(); // 新增：全选所有单元格
 
     void addRowAction();
     void addColumnAction();
