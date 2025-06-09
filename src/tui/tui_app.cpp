@@ -3,16 +3,32 @@
 #include <iostream>
 #include <string>
 #include <algorithm>
-#include <iomanip> // 新增：用于设置浮点数输出精度
+#include <iomanip> 
+#include <cctype> // For std::isspace
 #include "../utils/logger.h"
 #include "../grammar/grammar_tokenizer.h"
 #include "../grammar/grammar_parser.h"
-#include "enhanced_matrix_editor.h" // 已经在 tui_app.h 中包含
+#include "enhanced_matrix_editor.h" 
+#include "tui_suggestion_box.h" // 已经在 tui_app.h 中包含
 
 // 新增：定义输出区域的布局常量
 const int RESULT_AREA_TITLE_ROW = 2; // "输出区域:" 标题所在的行 (0-indexed)
 const int RESULT_AREA_CONTENT_START_ROW = RESULT_AREA_TITLE_ROW + 1; // 实际内容开始的第一行
 const int MATRIX_EDITOR_CELL_WIDTH = 8; // 矩阵编辑器单元格宽度
+
+// 定义已知函数和命令列表
+const std::vector<std::string> TuiApp::KNOWN_FUNCTIONS = {
+    "transpose", "inverse", "inverse_gauss", "det", "det_expansion",
+    "rank", "ref", "rref", "cofactor_matrix", "adjugate",
+    "dot", "cross", "norm", "normalize"
+    // 可以根据实际情况添加更多函数
+};
+
+const std::vector<std::string> TuiApp::KNOWN_COMMANDS = {
+    "help", "clear", "vars", "show", "exit", "steps", "new", "edit", "export", "import"
+    // 可以根据实际情况添加更多命令
+};
+
 
 TuiApp::TuiApp() 
     : historyIndex(0), running(true), 
@@ -20,6 +36,7 @@ TuiApp::TuiApp()
       cursorPosition(0), 
       // 初始化新的编辑器指针为空
       matrixEditor(nullptr),
+      suggestionBox(nullptr), // 初始化 suggestionBox
       stepDisplayStartRow(0) // 初始化步骤显示起始行
 {
     // 初始化终端以支持ANSI转义序列
@@ -31,6 +48,9 @@ TuiApp::TuiApp()
     auto [rows, cols] = Terminal::getSize();
     terminalRows = rows;
     terminalCols = cols;
+
+    // 初始化 suggestionBox
+    suggestionBox = std::make_unique<SuggestionBox>(terminalCols);
 
     // 计算UI布局
     inputRow = terminalRows - 2;
@@ -58,7 +78,7 @@ void TuiApp::run()
             // 状态栏由编辑器或TuiApp更新
             // drawStatusBar(); // 确保状态栏在编辑器绘制后更新，如果编辑器不自己画的话
         } else {
-            updateUI();
+            updateUI(); // updateUI 会调用 drawInputPrompt, drawInputPrompt 会调用 suggestionBox->draw
         }
         drawStatusBar(); // 总是绘制状态栏，确保它在最下面且最新
         
@@ -82,7 +102,7 @@ void TuiApp::initUI()
     drawHeader();
     // 如果编辑器激活，不绘制标准输入提示和结果区，由编辑器负责
     if (!matrixEditor) {
-        drawInputPrompt();
+        drawInputPrompt(); // drawInputPrompt 内部会处理 suggestionBox 的绘制
         drawResultArea(); 
     }
     drawStatusBar();
@@ -97,22 +117,50 @@ void TuiApp::updateUI()
         terminalRows = rows;
         terminalCols = cols;
         inputRow = terminalRows - 2;
+        // 如果终端大小改变，可能需要重新创建或更新 suggestionBox 的宽度
+        suggestionBox = std::make_unique<SuggestionBox>(terminalCols);
         initUI();
     }
 
     // 更新输入提示行 (仅当编辑器未激活时)
     if (!matrixEditor) {
-        drawInputPrompt();
+        drawInputPrompt(); // drawInputPrompt 内部会处理 suggestionBox 的绘制
     }
     // 状态栏总是更新 (或者由编辑器更新自己的状态消息)
     // drawStatusBar(); // 已移至run循环末尾
 }
+
+// 新增：清除候选框可能占用的区域
+void TuiApp::clearSuggestionArea() {
+    // 确保此函数定义存在且在 TuiApp 类的作用域内
+    // 如果 suggestionBox 本身不可见，或者它自己管理清除，这里可能不需要做太多
+    // 但为了安全，在它隐藏后，我们确保它占用的区域被重绘为背景
+    
+    // 假设候选框最多5行，绘制在 inputRow 之上
+    // 这个函数主要在 suggestionBox->hide() 之后，确保屏幕干净
+    int maxSuggestionLines = 5; // 与 SuggestionBox 的 maxDisplayItems 对应
+    int startClearRow = inputRow - maxSuggestionLines;
+    if (startClearRow < 0) startClearRow = 0;
+
+    // 只清除到输入行之前，避免清除输入行本身或状态栏
+    for (int i = startClearRow; i < inputRow; ++i) {
+        if (i >= 0) { // 确保行号有效
+            Terminal::setCursor(i, 0);
+            std::string spaces(terminalCols, ' ');
+            std::cout << spaces;
+        }
+    }
+}
+
 
 void TuiApp::handleInput()
 {
     // 读取一个字符
     int key = Terminal::readChar();
     
+    // 将 suggestionBoxWasVisible 的声明移到函数开头
+    bool suggestionBoxWasVisible = suggestionBox->isVisible();
+
     // 如果增强型编辑器激活，将输入传递给它
     if (matrixEditor) {
         EnhancedMatrixEditor::EditorResult result = matrixEditor->handleInput(key);
@@ -133,6 +181,42 @@ void TuiApp::handleInput()
         return;
     }
     
+    // 优先处理候选框输入
+    if (suggestionBox->isVisible()) {
+        SuggestionAction action = suggestionBox->handleKey(key);
+        if (action == SuggestionAction::APPLY_SUGGESTION) {
+            std::string selectedText = suggestionBox->getSelectedSuggestion().text;
+            std::string prefixToReplace = suggestionBox->getCurrentInputPrefix();
+            size_t wordStartPos = currentInput.rfind(prefixToReplace, cursorPosition - prefixToReplace.length());
+            
+            if (wordStartPos != std::string::npos && wordStartPos + prefixToReplace.length() == cursorPosition) {
+                 currentInput.replace(wordStartPos, prefixToReplace.length(), selectedText);
+                 cursorPosition = wordStartPos + selectedText.length();
+            } else { 
+                size_t originalCursor = cursorPosition;
+                currentInput.insert(cursorPosition, selectedText);
+                cursorPosition += selectedText.length();
+                if (originalCursor >= prefixToReplace.length() && 
+                    currentInput.substr(originalCursor - prefixToReplace.length(), prefixToReplace.length()) == prefixToReplace) {
+                    currentInput.erase(originalCursor - prefixToReplace.length(), prefixToReplace.length());
+                    cursorPosition -= prefixToReplace.length();
+                }
+            }
+            suggestionBox->hide();
+            clearSuggestionArea(); // 调用 clearSuggestionArea
+            drawInputPrompt();     
+            return; // 修改：移除对key的检查，Tab键和Enter键不再冲突
+        } else if (action == SuggestionAction::CLOSE_BOX) {
+            suggestionBox->hide();
+            clearSuggestionArea(); // 调用 clearSuggestionArea
+            drawInputPrompt();
+            return;
+        } else if (action == SuggestionAction::NAVIGATION) {
+            drawInputPrompt(); 
+            return;
+        }
+    }
+    
     // 检查是否是退格键(包括Linux的127) - 仅当编辑器未激活
     if (key == KEY_BACKSPACE) {
         // 删除光标前一个字符
@@ -140,14 +224,11 @@ void TuiApp::handleInput()
         {
             currentInput.erase(cursorPosition - 1, 1);
             cursorPosition--;
-            drawInputPrompt();
-            std::cout.flush(); // 确保更新立即显示
+            // drawInputPrompt(); // Defer drawing until after suggestion update
+        } else { // Backspace at start of empty line
+             return;
         }
-        return;
-    }
-
-    // 如果处于步骤显示模式，处理导航键
-    if (inStepDisplayMode)
+    } else if (inStepDisplayMode)
     {
         if (key == KEY_ESCAPE)
         {
@@ -215,7 +296,11 @@ void TuiApp::handleInput()
         else
         {
             // ESC键
-            if (currentInput.empty())
+            if (suggestionBox->isVisible()) { // 如果候选框可见，ESC优先关闭候选框
+                suggestionBox->hide();
+                clearSuggestionArea(); // 调用 clearSuggestionArea
+                // drawInputPrompt(); // Defer drawing
+            } else if (currentInput.empty())
             {
                 running = false; // 如果输入为空，退出程序
             }
@@ -223,13 +308,16 @@ void TuiApp::handleInput()
             {
                 currentInput.clear(); // 否则清空当前输入
                 cursorPosition = 0;
-                drawInputPrompt();
+                // drawInputPrompt(); // Defer
             }
         }
-    }
-    else if (key == KEY_ENTER)
-    {
-        // 如果输入不为空，执行命令
+    } else if (key == KEY_ENTER) {
+        // Enter键现在只用于执行命令，不再用于选择候选词
+        // 如果候选框可见，先隐藏它
+        if (suggestionBox->isVisible()){ 
+            suggestionBox->hide();
+            clearSuggestionArea(); // 调用 clearSuggestionArea
+        }
         if (!currentInput.empty())
         {
             executeCommand(currentInput);
@@ -251,42 +339,66 @@ void TuiApp::handleInput()
             historyIndex = 0;
             currentInput.clear();
             cursorPosition = 0;
-            drawInputPrompt();
+            // drawInputPrompt(); // Defer
         }
-    }
-    else if (key == KEY_BACKSPACE)
-    {
-        // 删除光标前一个字符
-        if (cursorPosition > 0 && !currentInput.empty())
-        {
-            currentInput.erase(cursorPosition - 1, 1);
-            cursorPosition--;
-            drawInputPrompt();
+    } else if (key >= 32 && key <= 126) { // 可打印字符
+        if (key == '(') {
+            // 括号自动补全：当输入(时，自动添加一对括号并将光标放在中间
+            currentInput.insert(cursorPosition, "()");
+            cursorPosition++; // 只移动一位，使光标位于()之间
+        } else {
+            // 正常处理其他可打印字符
+            currentInput.insert(cursorPosition, 1, static_cast<char>(key));
+            cursorPosition++;
         }
-    }
-    // 注意: KEY_DELETE 的处理需要 tui_terminal.cpp 中的 readChar 正确返回一个可识别的 KEY_DELETE 值
-    // 假设 KEY_DELETE 在 tui_terminal.h 中定义，并且 readChar 能返回它
-    // else if (key == KEY_DELETE) { // 处理 Delete 键
-    //     if (cursorPosition < currentInput.length()) {
-    //         currentInput.erase(cursorPosition, 1);
-    //         drawInputPrompt();
-    //     }
-    // }
-    else if (key >= 32 && key <= 126) // 可打印字符
-    {
-        currentInput.insert(cursorPosition, 1, static_cast<char>(key));
-        cursorPosition++;
-        drawInputPrompt();
-        // 如果用户在历史导航时输入，则将当前输入视为新命令
+        
         if (historyIndex != 0) {
-            historyIndex = 0; // 不再处于历史导航状态
-            // tempInputBuffer 将在下次按 UP 时重新填充，或在按 ENTER 时清除
+            historyIndex = 0; 
+        }
+        // drawInputPrompt(); // Defer
+    } else { // 处理其他特殊键，如箭头键
+        // 如果候选框不可见，才允许历史导航等
+        if (!suggestionBoxWasVisible) { // Use suggestionBoxWasVisible to avoid conflict if ESC closed the box
+             handleSpecialKey(key); // handleSpecialKey calls drawInputPrompt
+        } else {
+            // If suggestion box was visible but didn't handle the key (e.g. left/right arrow)
+            // and it wasn't a char key, it might be a command for TuiApp itself.
+            // For now, if suggestion box was visible, assume it or the char handler takes precedence.
+            // This 'else' branch for special keys might need refinement if specific non-char,
+            // non-suggestion-box keys need to work while box is visible.
+            // However, up/down/enter/esc are handled by suggestion box.
+            // Left/right should affect cursorPosition, then suggestions update.
+            if (key == KEY_LEFT || key == KEY_RIGHT) {
+                 handleSpecialKey(key); // This will move cursor and call drawInputPrompt
+            }
         }
     }
-    else // 处理其他特殊键，如箭头键，这些可能由 readChar 直接返回定义好的常量
-    {
-        handleSpecialKey(key); // 将其他键传递给 handleSpecialKey
+
+    // 更新候选词 (在输入或删除后)
+    // 但不在Enter后，因为命令已执行，输入已清空
+    if (key != KEY_ENTER) {
+        size_t currentWordStartPos = 0; // Relative to currentInput string
+        std::string word_prefix = getCurrentWordForSuggestion(currentWordStartPos);
+        if (!word_prefix.empty()) {
+            // 先清除旧的候选框区域，然后再更新显示新的候选词
+            clearSuggestionArea(); 
+            suggestionBox->updateSuggestions(word_prefix, getVariableNames(), KNOWN_FUNCTIONS, KNOWN_COMMANDS);
+        } else {
+            if (suggestionBox->isVisible()) { // If no prefix but box was visible, hide it
+                suggestionBox->hide();
+                clearSuggestionArea(); // 调用 clearSuggestionArea
+            }
+        }
+    } else { // After Enter, ensure box is hidden
+        if (suggestionBox->isVisible()) {
+            suggestionBox->hide();
+            clearSuggestionArea(); // 调用 clearSuggestionArea
+        }
     }
+    
+    // 统一在末尾绘制输入提示，确保所有状态更新后UI正确显示
+    drawInputPrompt();
+    std::cout.flush();
 }
 
 void TuiApp::printToResultView(const std::string& text, Color color) {
@@ -332,6 +444,12 @@ std::string TuiApp::variableToString(const Variable& var) {
 
 void TuiApp::executeCommand(const std::string &input)
 {
+    if (suggestionBox->isVisible()) { // Ensure box is hidden before execution
+        suggestionBox->hide();
+        clearSuggestionArea(); // 调用 clearSuggestionArea
+        drawInputPrompt(); 
+        std::cout.flush();
+    }
     try
     {
         // 确保输入非空
@@ -714,7 +832,7 @@ void TuiApp::showHelp()
 {
     if (matrixEditor) return; // 不在编辑器模式下显示帮助
     // resultRow 当前指向命令行的下一行
-    Terminal::setCursor(resultRow, 0); // 从 resultRow 开始打印帮助信息
+    Terminal::setCursor(resultRow, 0); // 从 resultRow 开始打印帮助信息 改成(0,0)是错误的
     Terminal::setForeground(Color::CYAN);
     std::cout << "帮助信息：\n"; // 示例：这会占用 resultRow
     resultRow++;                 // 更新 resultRow
@@ -979,7 +1097,19 @@ void TuiApp::drawHeader()
 
 void TuiApp::drawInputPrompt()
 {
-    if (matrixEditor) return; // 编辑器激活时不绘制主输入提示
+    if (matrixEditor) return; 
+
+    // 先绘制候选框 (如果可见)
+    // 候选框的绘制位置需要基于当前光标正在编辑的词的起始位置
+    if (suggestionBox->isVisible()) {
+        size_t currentWordStartPosInString = 0;
+        getCurrentWordForSuggestion(currentWordStartPosInString); // Get the start index of the word in currentInput
+        // The column for suggestionBox->draw should be where this word starts on screen.
+        // currentWordStartPosInInput is the offset from "> "
+        suggestionBox->draw(inputRow, 2, currentWordStartPosInString);
+    }
+
+
     Terminal::setCursor(inputRow, 0);
     Terminal::setForeground(Color::GREEN);
     std::cout << "> ";
@@ -1358,4 +1488,41 @@ void TuiApp::drawStepProgressBar() {
     std::cout << currentStep + 1;
     
     Terminal::resetColor();
+}
+
+// 新增辅助函数实现
+std::vector<std::string> TuiApp::getVariableNames() const {
+    std::vector<std::string> names;
+    for (const auto& pair : interpreter.getVariables()) {
+        names.push_back(pair.first);
+    }
+    return names;
+}
+
+// 修改：获取当前输入单词以供建议，并返回其在 currentInput 中的起始位置
+std::string TuiApp::getCurrentWordForSuggestion(size_t& wordStartPosInInput) const {
+    wordStartPosInInput = 0; // Default to 0
+    if (currentInput.empty() || cursorPosition == 0) {
+        return "";
+    }
+
+    size_t endPos = cursorPosition;
+        // 如果光标前的字符是空格，则不认为正在输入一个可建议的单词的中间或末尾
+        // (除非这是为了开始一个新词，但那时 prefix 为空，由 updateSuggestions 处理)
+        // 如果光标前的字符是空格或左括号，则不认为正在输入一个可建议的单词的中间或末尾
+    if (std::isspace(currentInput[endPos - 1]) || currentInput[endPos - 1] == '(') { 
+        return "";
+    }
+
+    size_t startPos = endPos;
+    while (startPos > 0 && !std::isspace(currentInput[startPos - 1]) && currentInput[startPos - 1] != '(') {
+        startPos--;
+    }
+    
+    // If startPos is still == endPos here, it means cursor was at pos 0 or after a space.
+    // But we checked for currentInput[endPos-1] not being a space.
+    // So, startPos should be < endPos.
+    
+    wordStartPosInInput = startPos; // Store the start position of the word in the input string
+    return currentInput.substr(startPos, endPos - startPos);
 }

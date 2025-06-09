@@ -9,6 +9,7 @@ const int KEY_ENTER = 13;
 const int KEY_ESCAPE = 27;
 const int KEY_BACKSPACE = 8;
 const int KEY_DELETE = 127; // Linux系统通常使用127作为退格键(Backspace)
+const int KEY_TAB = 9;     // 新增：Tab键定义
 // 保持原有的特殊键值定义
 const int KEY_UP = 256;
 const int KEY_DOWN = 257;

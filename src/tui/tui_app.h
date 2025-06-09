@@ -4,13 +4,15 @@
 #include <deque>
 #include <memory>
 #include <sstream>
+#include <vector> // Required for KNOWN_FUNCTIONS/COMMANDS
 #include "../grammar/grammar_interpreter.h"
 #include "../grammar/grammar_tokenizer.h"
 #include "../grammar/grammar_parser.h"
 #include "../operation_step.h"
 #include "../determinant_expansion.h"
 #include "tui_terminal.h"
-#include "enhanced_matrix_editor.h" // 新增：包含增强型编辑器头文件
+#include "enhanced_matrix_editor.h"
+#include "tui_suggestion_box.h" // 新增：包含候选框头文件
 
 // 最大历史记录数量
 const int MAX_HISTORY = 50;
@@ -58,6 +60,8 @@ private:
 
     // 新增：增强型矩阵编辑器实例
     std::unique_ptr<EnhancedMatrixEditor> matrixEditor;
+    // 新增：命令候选框实例
+    std::unique_ptr<SuggestionBox> suggestionBox;
     
     // 绘制UI元素
     void drawHeader();
@@ -65,7 +69,8 @@ private:
     void drawStatusBar();
     void drawResultArea();
     void clearResultArea(); // 保持不变
-    
+    void clearSuggestionArea(); // 新增：清除候选框区域
+
     // 处理命令和输入
     void handleSpecialKey(int key);
     void navigateHistory(bool up);
@@ -95,6 +100,9 @@ private:
     // 辅助函数
     void printToResultView(const std::string& text, Color color = Color::DEFAULT);
     std::string variableToString(const Variable& var);
+    std::vector<std::string> getVariableNames() const; // 新增：获取变量名列表
+    std::string getCurrentWordForSuggestion(size_t& wordStartPosInInput) const; // 新增：获取当前输入单词以供建议
+                                                                            // wordStartPosInInput will be relative to currentInput string
     
 public:
     TuiApp();
@@ -103,4 +111,8 @@ public:
     void updateUI();
     void handleInput();
     void executeCommand(const std::string &input);
+
+    // 新增：已知函数和命令列表 (在 .cpp 文件中定义)
+    static const std::vector<std::string> KNOWN_FUNCTIONS;
+    static const std::vector<std::string> KNOWN_COMMANDS;
 };
