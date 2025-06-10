@@ -2,24 +2,31 @@
 #define FRACTION_H
 
 #include <iostream>
-#include <numeric> // For std::gcd
+#include <boost/multiprecision/cpp_int.hpp>
+
+// 使用 Boost 的任意精度整数类型
+using BigInt = boost::multiprecision::cpp_int;
 
 class Fraction {
 private:
-    long long numerator;
-    long long denominator;
+    BigInt numerator;
+    BigInt denominator;
 
     void simplify(); // 用于化简分数
 
 public:
     // 构造函数
     Fraction();
+    Fraction(const BigInt& num);
+    Fraction(const BigInt& num, const BigInt& den);
+    
+    // 为了向后兼容，保留 long long 构造函数
     Fraction(long long num);
     Fraction(long long num, long long den);
 
     // 获取分子和分母
-    long long getNumerator() const;
-    long long getDenominator() const;
+    const BigInt& getNumerator() const;
+    const BigInt& getDenominator() const;
 
     // 算术运算符重载
     Fraction operator+(const Fraction& other) const;
@@ -46,6 +53,9 @@ public:
 
     // 输出流运算符重载
     friend std::ostream& operator<<(std::ostream& os, const Fraction& f);
+    
+    // 新增：转换为字符串，用于更好的显示
+    std::string toString() const;
 };
 
 #endif // FRACTION_H

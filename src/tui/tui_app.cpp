@@ -4,7 +4,8 @@
 #include <string>
 #include <algorithm>
 #include <iomanip> 
-#include <cctype> // For std::isspace
+#include <cctype>
+#include <boost/lexical_cast.hpp> // 新增：用于 BigInt 到字符串的转换
 #include "../utils/logger.h"
 #include "../grammar/grammar_tokenizer.h"
 #include "../grammar/grammar_parser.h"
@@ -831,8 +832,8 @@ void TuiApp::executeCommand(const std::string &input)
 void TuiApp::showHelp()
 {
     if (matrixEditor) return; // 不在编辑器模式下显示帮助
-    // resultRow 当前指向命令行的下一行
-    Terminal::setCursor(resultRow, 0); // 从 resultRow 开始打印帮助信息 改成(0,0)是错误的
+
+    Terminal::setCursor(resultRow, 0); 
     Terminal::setForeground(Color::CYAN);
     std::cout << "帮助信息：\n"; // 示例：这会占用 resultRow
     resultRow++;                 // 更新 resultRow
@@ -1270,7 +1271,9 @@ void TuiApp::showVariableWithFormat(const std::string &varName, int precision) {
     switch (it->second.type) {
     case VariableType::FRACTION:
         {
-            double fval = (double)it->second.fractionValue.getNumerator() / it->second.fractionValue.getDenominator();
+            // 修复：使用 convert_to<double>() 方法进行类型转换
+            double fval = it->second.fractionValue.getNumerator().convert_to<double>() / 
+                         it->second.fractionValue.getDenominator().convert_to<double>();
             std::cout << fval << std::endl;
             resultRow++;
         }
@@ -1278,7 +1281,9 @@ void TuiApp::showVariableWithFormat(const std::string &varName, int precision) {
     case VariableType::VECTOR:
         std::cout << "[";
         for (size_t i = 0; i < it->second.vectorValue.size(); ++i) {
-            double fval = (double)it->second.vectorValue.at(i).getNumerator() / it->second.vectorValue.at(i).getDenominator();
+            // 修复：使用 convert_to<double>() 方法进行类型转换
+            double fval = it->second.vectorValue.at(i).getNumerator().convert_to<double>() / 
+                         it->second.vectorValue.at(i).getDenominator().convert_to<double>();
             std::cout << fval;
             if (i < it->second.vectorValue.size() - 1) {
                 std::cout << ", ";
@@ -1295,7 +1300,9 @@ void TuiApp::showVariableWithFormat(const std::string &varName, int precision) {
             Terminal::setCursor(resultRow, 0);
             std::cout << "| ";
             for (size_t c = 0; c < it->second.matrixValue.colCount(); ++c) {
-                double fval = (double)it->second.matrixValue.at(r, c).getNumerator() / it->second.matrixValue.at(r, c).getDenominator();
+                // 修复：使用 convert_to<double>() 方法进行类型转换
+                double fval = it->second.matrixValue.at(r, c).getNumerator().convert_to<double>() / 
+                             it->second.matrixValue.at(r, c).getDenominator().convert_to<double>();
                 std::cout << std::setw(8) << fval << " ";
             }
             std::cout << "|" << std::endl;

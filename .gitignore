@@ -10,3 +10,5 @@ GetStart.md
 Doxyfile
 /devtool
 PROJECT_PLAN.md
+/release
+/src/boost

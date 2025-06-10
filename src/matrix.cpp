@@ -3,7 +3,8 @@
 #include <iomanip>
 #include <algorithm>
 #include <sstream>
-#include <stdexcept> // Required for std::out_of_range, std::invalid_argument
+#include <stdexcept>
+#include <boost/lexical_cast.hpp> // 新增：用于 BigInt 到字符串的转换
 
 Matrix::Matrix(size_t r, size_t c) : rows(r), cols(c), data(r, std::vector<Fraction>(c)) {}
 
@@ -19,13 +20,32 @@ const Fraction& Matrix::at(size_t r, size_t c) const { return data[r][c]; }
 void Matrix::input(std::istream& is) {
     for (size_t i = 0; i < rows; ++i)
         for (size_t j = 0; j < cols; ++j) {
-            long long num, den = 1;
-            char ch;
-            is >> num;
-            if (is.peek() == '/') {
-                is >> ch >> den;
+            std::string input_str;
+            is >> input_str;
+            
+            // 查找是否有分数形式 (包含 '/')
+            size_t slash_pos = input_str.find('/');
+            if (slash_pos != std::string::npos) {
+                // 分数形式输入
+                std::string num_str = input_str.substr(0, slash_pos);
+                std::string den_str = input_str.substr(slash_pos + 1);
+                
+                try {
+                    BigInt num(num_str);
+                    BigInt den(den_str);
+                    data[i][j] = Fraction(num, den);
+                } catch (const std::exception& e) {
+                    throw std::invalid_argument("Invalid fraction format: " + input_str);
+                }
+            } else {
+                // 整数形式输入
+                try {
+                    BigInt num(input_str);
+                    data[i][j] = Fraction(num);
+                } catch (const std::exception& e) {
+                    throw std::invalid_argument("Invalid number format: " + input_str);
+                }
             }
-            data[i][j] = Fraction(num, den);
         }
 }
 
@@ -328,8 +348,8 @@ Fraction Matrix::determinantByExpansion(ExpansionHistory& history) const {
         Fraction result = data[0][0];
         history.addStep(ExpansionStep(
             ExpansionType::RESULT_STATE,
-            "1x1矩阵行列式 = " + std::to_string(result.getNumerator()) + 
-            (result.getDenominator() != 1 ? "/" + std::to_string(result.getDenominator()) : ""),
+            "1x1矩阵行列式 = " + boost::lexical_cast<std::string>(result.getNumerator()) + 
+            (result.getDenominator() != 1 ? "/" + boost::lexical_cast<std::string>(result.getDenominator()) : ""),
             *this,
             0, 0, result, Fraction(1), result, result
         ));

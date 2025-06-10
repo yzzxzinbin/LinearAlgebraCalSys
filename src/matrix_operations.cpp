@@ -1,5 +1,6 @@
 #include "matrix_operations.h"
 #include <sstream>
+#include <boost/lexical_cast.hpp> // 新增：用于 BigInt 到字符串的转换
 
 // 实现初等行变换 - 返回新矩阵
 Matrix MatrixOperations::swapRows(const Matrix& mat, size_t row1, size_t row2) {
@@ -291,8 +292,8 @@ Fraction MatrixOperations::determinant(const Matrix& mat, OperationHistory& hist
         Fraction result = mat.at(0, 0);
         history.addStep(OperationStep(
             OperationType::RESULT_STATE,
-            "行列式为: " + std::to_string(result.getNumerator()) + 
-            (result.getDenominator() != 1 ? "/" + std::to_string(result.getDenominator()) : ""),
+            "行列式为: " + boost::lexical_cast<std::string>(result.getNumerator()) + 
+            (result.getDenominator() != 1 ? "/" + boost::lexical_cast<std::string>(result.getDenominator()) : ""),
             mat
         ));
         return result;
