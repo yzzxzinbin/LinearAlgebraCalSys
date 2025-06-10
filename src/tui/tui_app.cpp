@@ -5,7 +5,8 @@
 #include <algorithm>
 #include <iomanip> 
 #include <cctype>
-#include <boost/lexical_cast.hpp> // 新增：用于 BigInt 到字符串的转换
+#include <boost/lexical_cast.hpp>
+#include <boost/multiprecision/cpp_dec_float.hpp> // 新增：任意精度十进制浮点数
 #include "../utils/logger.h"
 #include "../grammar/grammar_tokenizer.h"
 #include "../grammar/grammar_parser.h"
@@ -1268,23 +1269,53 @@ void TuiApp::showVariableWithFormat(const std::string &varName, int precision) {
     // 设置输出格式为浮点数，精度为指定值
     std::cout << std::fixed << std::setprecision(precision);
 
+    // 使用 Boost 的任意精度浮点数类型
+    using HighPrecisionFloat = boost::multiprecision::cpp_dec_float_100; // 100位精度
+
     switch (it->second.type) {
     case VariableType::FRACTION:
         {
-            // 修复：使用 convert_to<double>() 方法进行类型转换
-            double fval = it->second.fractionValue.getNumerator().convert_to<double>() / 
-                         it->second.fractionValue.getDenominator().convert_to<double>();
-            std::cout << fval << std::endl;
+            try {
+                // 使用任意精度浮点数进行除法运算
+                HighPrecisionFloat numerator(it->second.fractionValue.getNumerator().str());
+                HighPrecisionFloat denominator(it->second.fractionValue.getDenominator().str());
+                HighPrecisionFloat result = numerator / denominator;
+                
+                // 转换为 double 以便输出（如果结果在 double 范围内）
+                if (result > (std::numeric_limits<double>::max)()) {
+                    std::cout << "INF" << std::endl;
+                } else if (result < (std::numeric_limits<double>::lowest)()) {
+                    std::cout << "-INF" << std::endl;
+                } else {
+                    double fval = result.convert_to<double>();
+                    std::cout << fval << std::endl;
+                }
+            } catch (const std::exception& e) {
+                std::cout << "计算错误: " << e.what() << std::endl;
+            }
             resultRow++;
         }
         break;
     case VariableType::VECTOR:
         std::cout << "[";
         for (size_t i = 0; i < it->second.vectorValue.size(); ++i) {
-            // 修复：使用 convert_to<double>() 方法进行类型转换
-            double fval = it->second.vectorValue.at(i).getNumerator().convert_to<double>() / 
-                         it->second.vectorValue.at(i).getDenominator().convert_to<double>();
-            std::cout << fval;
+            try {
+                HighPrecisionFloat numerator(it->second.vectorValue.at(i).getNumerator().str());
+                HighPrecisionFloat denominator(it->second.vectorValue.at(i).getDenominator().str());
+                HighPrecisionFloat result = numerator / denominator;
+                
+                if (result > (std::numeric_limits<double>::max)()) {
+                    std::cout << "INF";
+                } else if (result < (std::numeric_limits<double>::lowest)()) {
+                    std::cout << "-INF";
+                } else {
+                    double fval = result.convert_to<double>();
+                    std::cout << fval;
+                }
+            } catch (const std::exception& e) {
+                std::cout << "ERR";
+            }
+            
             if (i < it->second.vectorValue.size() - 1) {
                 std::cout << ", ";
             }
@@ -1300,10 +1331,22 @@ void TuiApp::showVariableWithFormat(const std::string &varName, int precision) {
             Terminal::setCursor(resultRow, 0);
             std::cout << "| ";
             for (size_t c = 0; c < it->second.matrixValue.colCount(); ++c) {
-                // 修复：使用 convert_to<double>() 方法进行类型转换
-                double fval = it->second.matrixValue.at(r, c).getNumerator().convert_to<double>() / 
-                             it->second.matrixValue.at(r, c).getDenominator().convert_to<double>();
-                std::cout << std::setw(8) << fval << " ";
+                try {
+                    HighPrecisionFloat numerator(it->second.matrixValue.at(r, c).getNumerator().str());
+                    HighPrecisionFloat denominator(it->second.matrixValue.at(r, c).getDenominator().str());
+                    HighPrecisionFloat result = numerator / denominator;
+                    
+                    if (result > (std::numeric_limits<double>::max)()) {
+                        std::cout << std::setw(8) << "INF" << " ";
+                    } else if (result < (std::numeric_limits<double>::lowest)()) {
+                        std::cout << std::setw(8) << "-INF" << " ";
+                    } else {
+                        double fval = result.convert_to<double>();
+                        std::cout << std::setw(8) << fval << " ";
+                    }
+                } catch (const std::exception& e) {
+                    std::cout << std::setw(8) << "ERR" << " ";
+                }
             }
             std::cout << "|" << std::endl;
             resultRow++;
@@ -1316,7 +1359,7 @@ void TuiApp::showVariableWithFormat(const std::string &varName, int precision) {
     std::cout.precision(6); // 恢复默认精度
 
     Terminal::resetColor();
-    statusMessage = "以浮点数格式显示变量: " + varName + " (精度: " + std::to_string(precision) + ")";
+    statusMessage = "以高精度浮点数格式显示变量: " + varName + " (精度: " + std::to_string(precision) + ")";
 }
 
 void TuiApp::drawResultArea()

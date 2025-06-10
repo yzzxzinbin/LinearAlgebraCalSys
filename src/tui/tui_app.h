@@ -83,6 +83,10 @@ private:
     void showVariable(const std::string &varName);
     // 新增：以浮点数格式显示变量
     void showVariableWithFormat(const std::string &varName, int precision);
+    void showVariableWithHighPrecision(const std::string &varName, int precision, int floatPrecision);
+    
+    template<typename HighPrecFloat>
+    void displayWithPrecision(const Variable& var, int precision);
     
     // 步骤显示模式相关函数
     void enterStepDisplayMode(const OperationHistory& history);
