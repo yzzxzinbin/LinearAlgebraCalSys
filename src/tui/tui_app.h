@@ -81,8 +81,8 @@ private:
     void showHelp();
     void showVariables();
     void showVariable(const std::string &varName);
-    // 新增：以浮点数格式显示变量
-    void showVariableWithFormat(const std::string &varName, int precision);
+    void showVariableWithFormat(const std::string &varName, int precision); // -f 选项：有效数字
+    void showVariableWithDecimalFormat(const std::string &varName, int decimalPlaces); // -p 选项：小数位数
     void showVariableWithHighPrecision(const std::string &varName, int precision, int floatPrecision);
     
     template<typename HighPrecFloat>

@@ -613,11 +613,12 @@ void TuiApp::executeCommand(const std::string &input)
             iss >> varName; // 第一个词是变量名
             
             bool useFloat = false;
-            int precision = 2; // 默认精度为2位小数
+            bool useDecimal = false;
+            int precision = 2; // 默认精度
             
             // 检查是否有更多参数
             if (iss >> option) {
-                // 检查是否是 -f 选项
+                // 检查是否是 -f 选项 (有效数字)
                 if (option.substr(0, 2) == "-f") {
                     useFloat = true;
                     // 检查是否指定了精度
@@ -629,11 +630,28 @@ void TuiApp::executeCommand(const std::string &input)
                         }
                     }
                 }
+                // 检查是否是 -p 选项 (小数点后位数)
+                else if (option.substr(0, 2) == "-p") {
+                    useDecimal = true;
+                    // 检查是否指定了精度
+                    if (option.length() > 2) {
+                        try {
+                            precision = std::stoi(option.substr(2));
+                        } catch (const std::exception&) {
+                            // 解析精度失败，使用默认值为0
+                            precision = 0;
+                        }
+                    } else {
+                        precision = 0; // 默认为整数显示
+                    }
+                }
             }
             
             // 根据选项显示变量
             if (useFloat) {
                 showVariableWithFormat(varName, precision);
+            } else if (useDecimal) {
+                showVariableWithDecimalFormat(varName, precision);
             } else {
                 showVariable(varName);
             }
@@ -848,7 +866,10 @@ void TuiApp::showHelp()
     std::cout << "  vars                           - 显示所有变量\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
-    std::cout << "  show <变量名> -f<精度>(可选)   - 显示特定变量的值\n";
+    std::cout << "  show <变量名> -f<精度>(可选)   - 以有效数字格式显示变量\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
+    std::cout << "  show <变量名> -p<精度>(可选)   - 以小数位数格式显示变量\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
     std::cout << "  exit                           - 退出程序\n";   
@@ -1266,55 +1287,95 @@ void TuiApp::showVariableWithFormat(const std::string &varName, int precision) {
     Terminal::setForeground(Color::CYAN);
     std::cout << varName << " = ";
 
-    // 设置输出格式为浮点数，精度为指定值
-    std::cout << std::fixed << std::setprecision(precision);
-
     // 使用 Boost 的任意精度浮点数类型
     using HighPrecisionFloat = boost::multiprecision::cpp_dec_float_100; // 100位精度
+
+    // 辅助函数：格式化单个数值为有效数字显示
+    auto formatValue = [&precision](const Fraction& frac) -> std::string {
+        try {
+            // 使用任意精度浮点数进行除法运算
+            HighPrecisionFloat numerator(frac.getNumerator().str());
+            HighPrecisionFloat denominator(frac.getDenominator().str());
+            HighPrecisionFloat result = numerator / denominator;
+            
+            // 检查溢出情况
+            if (result > (std::numeric_limits<double>::max)()) {
+                return "INF";
+            } else if (result < (std::numeric_limits<double>::lowest)()) {
+                return "-INF";
+            }
+            
+            double fval = result.convert_to<double>();
+            
+            // 检查是否为零
+            if (fval == 0.0) {
+                return "0";
+            }
+            
+            // 检查是否为整数（分母为1的情况）
+            if (frac.getDenominator() == 1) {
+                // 整数情况：检查是否需要科学计数法
+                std::string intStr = frac.getNumerator().str();
+                if (intStr.length() > static_cast<size_t>(precision + 1)) {
+                    // 使用科学计数法显示大整数
+                    std::stringstream ss;
+                    ss << std::scientific << std::setprecision(precision - 1) << fval;
+                    return ss.str();
+                } else {
+                    // 直接显示整数
+                    return intStr;
+                }
+            }
+            
+            // 非整数情况：使用有效数字格式
+            double absVal = std::abs(fval);
+            
+            // 判断使用定点还是科学计数法
+            // 当数值在 [0.1, 10^precision) 范围内时使用定点表示法
+            if (absVal >= 0.1 && absVal < std::pow(10.0, precision)) {
+                // 计算需要的小数位数以达到指定有效数字
+                int magnitude = static_cast<int>(std::floor(std::log10(absVal)));
+                int decimalPlaces = precision - magnitude - 1;
+                
+                if (decimalPlaces < 0) decimalPlaces = 0;
+                if (decimalPlaces > 15) decimalPlaces = 15; // 限制最大小数位数
+                
+                std::stringstream ss;
+                ss << std::fixed << std::setprecision(decimalPlaces) << fval;
+                std::string str = ss.str();
+                
+                // 移除末尾的零（但保留小数点前的零）
+                if (str.find('.') != std::string::npos) {
+                    str = str.substr(0, str.find_last_not_of('0') + 1);
+                    if (str.back() == '.') {
+                        str.pop_back();
+                    }
+                }
+                return str;
+            } else {
+                // 使用科学计数法
+                std::stringstream ss;
+                ss << std::scientific << std::setprecision(precision - 1) << fval;
+                return ss.str();
+            }
+        } catch (const std::exception& e) {
+            return "ERR";
+        }
+    };
 
     switch (it->second.type) {
     case VariableType::FRACTION:
         {
-            try {
-                // 使用任意精度浮点数进行除法运算
-                HighPrecisionFloat numerator(it->second.fractionValue.getNumerator().str());
-                HighPrecisionFloat denominator(it->second.fractionValue.getDenominator().str());
-                HighPrecisionFloat result = numerator / denominator;
-                
-                // 转换为 double 以便输出（如果结果在 double 范围内）
-                if (result > (std::numeric_limits<double>::max)()) {
-                    std::cout << "INF" << std::endl;
-                } else if (result < (std::numeric_limits<double>::lowest)()) {
-                    std::cout << "-INF" << std::endl;
-                } else {
-                    double fval = result.convert_to<double>();
-                    std::cout << fval << std::endl;
-                }
-            } catch (const std::exception& e) {
-                std::cout << "计算错误: " << e.what() << std::endl;
-            }
+            std::string formattedValue = formatValue(it->second.fractionValue);
+            std::cout << formattedValue << std::endl;
             resultRow++;
         }
         break;
     case VariableType::VECTOR:
         std::cout << "[";
         for (size_t i = 0; i < it->second.vectorValue.size(); ++i) {
-            try {
-                HighPrecisionFloat numerator(it->second.vectorValue.at(i).getNumerator().str());
-                HighPrecisionFloat denominator(it->second.vectorValue.at(i).getDenominator().str());
-                HighPrecisionFloat result = numerator / denominator;
-                
-                if (result > (std::numeric_limits<double>::max)()) {
-                    std::cout << "INF";
-                } else if (result < (std::numeric_limits<double>::lowest)()) {
-                    std::cout << "-INF";
-                } else {
-                    double fval = result.convert_to<double>();
-                    std::cout << fval;
-                }
-            } catch (const std::exception& e) {
-                std::cout << "ERR";
-            }
+            std::string formattedValue = formatValue(it->second.vectorValue.at(i));
+            std::cout << formattedValue;
             
             if (i < it->second.vectorValue.size() - 1) {
                 std::cout << ", ";
@@ -1331,22 +1392,8 @@ void TuiApp::showVariableWithFormat(const std::string &varName, int precision) {
             Terminal::setCursor(resultRow, 0);
             std::cout << "| ";
             for (size_t c = 0; c < it->second.matrixValue.colCount(); ++c) {
-                try {
-                    HighPrecisionFloat numerator(it->second.matrixValue.at(r, c).getNumerator().str());
-                    HighPrecisionFloat denominator(it->second.matrixValue.at(r, c).getDenominator().str());
-                    HighPrecisionFloat result = numerator / denominator;
-                    
-                    if (result > (std::numeric_limits<double>::max)()) {
-                        std::cout << std::setw(8) << "INF" << " ";
-                    } else if (result < (std::numeric_limits<double>::lowest)()) {
-                        std::cout << std::setw(8) << "-INF" << " ";
-                    } else {
-                        double fval = result.convert_to<double>();
-                        std::cout << std::setw(8) << fval << " ";
-                    }
-                } catch (const std::exception& e) {
-                    std::cout << std::setw(8) << "ERR" << " ";
-                }
+                std::string formattedValue = formatValue(it->second.matrixValue.at(r, c));
+                std::cout << std::setw(12) << formattedValue << " "; // 增加列宽以适应科学计数法
             }
             std::cout << "|" << std::endl;
             resultRow++;
@@ -1354,12 +1401,112 @@ void TuiApp::showVariableWithFormat(const std::string &varName, int precision) {
         break;
     }
 
-    // 恢复默认输出格式
-    std::cout.unsetf(std::ios_base::fixed);
-    std::cout.precision(6); // 恢复默认精度
+    Terminal::resetColor();
+    statusMessage = "以 " + std::to_string(precision) + " 位有效数字显示变量: " + varName;
+}
+
+void TuiApp::showVariableWithDecimalFormat(const std::string &varName, int decimalPlaces) {
+    if (matrixEditor) return; // 不在编辑器模式下显示变量
+    const auto &vars = interpreter.getVariables();
+    auto it = vars.find(varName);
+
+    // resultRow 当前指向命令行的下一行
+    Terminal::setCursor(resultRow, 0);
+
+    if (it == vars.end()) {
+        Terminal::setForeground(Color::RED);
+        std::cout << "错误: 变量 '" << varName << "' 未定义。" << std::endl;
+        Terminal::resetColor();
+        resultRow++;
+        statusMessage = "变量未找到: " + varName;
+        return;
+    }
+
+    Terminal::setForeground(Color::CYAN);
+    std::cout << varName << " = ";
+
+    // 使用 Boost 的任意精度浮点数类型
+    using HighPrecisionFloat = boost::multiprecision::cpp_dec_float_100; // 100位精度
+
+    // 辅助函数：格式化单个数值为小数点后指定位数显示
+    auto formatValueDecimal = [&decimalPlaces](const Fraction& frac) -> std::string {
+        try {
+            // 使用任意精度浮点数进行除法运算
+            HighPrecisionFloat numerator(frac.getNumerator().str());
+            HighPrecisionFloat denominator(frac.getDenominator().str());
+            HighPrecisionFloat result = numerator / denominator;
+            
+            // 检查溢出情况
+            if (result > (std::numeric_limits<double>::max)()) {
+                return "INF";
+            } else if (result < (std::numeric_limits<double>::lowest)()) {
+                return "-INF";
+            }
+            
+            double fval = result.convert_to<double>();
+            
+            // 如果小数位数为0，显示为整数
+            if (decimalPlaces == 0) {
+                // 检查是否为整数（分母为1的情况）
+                if (frac.getDenominator() == 1) {
+                    return frac.getNumerator().str();
+                } else {
+                    // 四舍五入到最近的整数
+                    long long rounded = static_cast<long long>(std::round(fval));
+                    return std::to_string(rounded);
+                }
+            } else {
+                // 设置固定小数位数格式
+                std::stringstream ss;
+                ss << std::fixed << std::setprecision(decimalPlaces) << fval;
+                return ss.str();
+            }
+        } catch (const std::exception& e) {
+            return "ERR";
+        }
+    };
+
+    switch (it->second.type) {
+    case VariableType::FRACTION:
+        {
+            std::string formattedValue = formatValueDecimal(it->second.fractionValue);
+            std::cout << formattedValue << std::endl;
+            resultRow++;
+        }
+        break;
+    case VariableType::VECTOR:
+        std::cout << "[";
+        for (size_t i = 0; i < it->second.vectorValue.size(); ++i) {
+            std::string formattedValue = formatValueDecimal(it->second.vectorValue.at(i));
+            std::cout << formattedValue;
+            
+            if (i < it->second.vectorValue.size() - 1) {
+                std::cout << ", ";
+            }
+        }
+        std::cout << "]" << std::endl;
+        resultRow++;
+        break;
+    case VariableType::MATRIX:
+        std::cout << "\n"; // 为 "m = " 和矩阵内容之间提供一行间隔
+        resultRow++;
+        
+        for (size_t r = 0; r < it->second.matrixValue.rowCount(); ++r) {
+            Terminal::setCursor(resultRow, 0);
+            std::cout << "| ";
+            for (size_t c = 0; c < it->second.matrixValue.colCount(); ++c) {
+                std::string formattedValue = formatValueDecimal(it->second.matrixValue.at(r, c));
+                std::cout << std::setw(10) << formattedValue << " ";
+            }
+            std::cout << "|" << std::endl;
+            resultRow++;
+        }
+        break;
+    }
 
     Terminal::resetColor();
-    statusMessage = "以高精度浮点数格式显示变量: " + varName + " (精度: " + std::to_string(precision) + ")";
+    std::string formatDesc = (decimalPlaces == 0) ? "整数格式" : (std::to_string(decimalPlaces) + " 位小数");
+    statusMessage = "以 " + formatDesc + " 显示变量: " + varName;
 }
 
 void TuiApp::drawResultArea()
