@@ -1279,6 +1279,7 @@ void TuiApp::showVariable(const std::string &varName)
         }
         break;
     case VariableType::RESULT:  // 新增：处理Result类型
+        std::cout << "\n"; // 为 "result = " 和结果内容之间提供一行间隔
         std::cout << it->second.resultValue << std::endl;
         resultRow++;
         break;

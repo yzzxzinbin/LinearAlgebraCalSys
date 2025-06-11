@@ -27,13 +27,26 @@ Fraction Interpreter::parseFractionString(const std::string &s) const
     size_t slash_pos = s.find('/');
     if (slash_pos == std::string::npos)
     {
-        return Fraction(std::stoll(s));
+        // 直接使用 BigInt 构造函数解析整数字符串
+        try {
+            BigInt num(s);
+            return Fraction(num);
+        } catch (const std::exception& e) {
+            throw std::invalid_argument("无法解析整数字符串: " + s + " (" + e.what() + ")");
+        }
     }
     else
     {
-        long long num = std::stoll(s.substr(0, slash_pos));
-        long long den = std::stoll(s.substr(slash_pos + 1));
-        return Fraction(num, den);
+        // 直接使用 BigInt 构造函数解析分子和分母字符串
+        try {
+            std::string numStr = s.substr(0, slash_pos);
+            std::string denStr = s.substr(slash_pos + 1);
+            BigInt num(numStr);
+            BigInt den(denStr);
+            return Fraction(num, den);
+        } catch (const std::exception& e) {
+            throw std::invalid_argument("无法解析分数字符串: " + s + " (" + e.what() + ")");
+        }
     }
 }
 
