@@ -149,6 +149,45 @@ void Interpreter::clearCurrentHistories() {
     currentExpHistory_.clear();
 }
 
+// 新增：实现 clearVariables 方法
+void Interpreter::clearVariables() {
+    variables.clear();
+    LOG_INFO("所有变量已被清除。");
+}
+
+// 新增：实现 deleteVariable 方法
+void Interpreter::deleteVariable(const std::string& name) {
+    auto it = variables.find(name);
+    if (it == variables.end()) {
+        throw std::runtime_error("无法删除变量: 变量 '" + name + "' 未定义。");
+    }
+    variables.erase(it);
+    LOG_INFO("变量 '" + name + "' 已被删除。");
+}
+
+// 新增：实现 renameVariable 方法
+void Interpreter::renameVariable(const std::string& oldName, const std::string& newName) {
+    if (oldName == newName) {
+        LOG_INFO("旧名称和新名称相同，无需重命名变量 '" + oldName + "'。");
+        return; // 名称相同，无需操作
+    }
+
+    auto old_it = variables.find(oldName);
+    if (old_it == variables.end()) {
+        throw std::runtime_error("无法重命名变量: 旧变量名 '" + oldName + "' 未定义。");
+    }
+
+    auto new_it = variables.find(newName);
+    if (new_it != variables.end()) {
+        throw std::runtime_error("无法重命名变量: 新变量名 '" + newName + "' 已存在。");
+    }
+
+    // 复制变量到新名称，然后删除旧名称
+    variables[newName] = old_it->second;
+    variables.erase(old_it);
+    LOG_INFO("变量 '" + oldName + "' 已重命名为 '" + newName + "'。");
+}
+
 Variable Interpreter::executeVariable(const VariableNode* node) {
     auto it = variables.find(node->name);
     if (it == variables.end()) {

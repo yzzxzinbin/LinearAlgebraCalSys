@@ -154,20 +154,35 @@ void MatrixOperations::toRowEchelonForm(Matrix& mat, OperationHistory& history) 
             swapRows(mat, r, i, history);
         }
         
-        // 移除以下主元归一化代码
+        // 新增逻辑：确保主元是整数
+        Fraction currentPivot = mat.at(r, lead);
+        if (currentPivot.getDenominator() != BigInt(1)) { // 如果分母不是1，说明是分数
+            BigInt denominator = currentPivot.getDenominator();
+            // 将当前行乘以分母，使主元变为整数 (原来的分子)
+            scaleRow(mat, r, Fraction(denominator), history);
+            // 更新 currentPivot，虽然在后续的消元中会重新获取 mat.at(r, lead)
+            // currentPivot = mat.at(r, lead); // mat.at(r, lead) 现在是整数
+        }
+        
+        // 移除以下主元归一化代码 (原代码中已注释)
         // Fraction pivot = mat.at(r, lead);
         // if (pivot != Fraction(1)) {
         //     scaleRow(mat, r, Fraction(1) / pivot, history);
         // }
         
         // 消去下方行的对应元素
-        for (size_t i = r + 1; i < rowCount; ++i) {
-            Fraction factor = mat.at(i, lead);
+        for (size_t k = r + 1; k < rowCount; ++k) { // 使用 k 避免与外层 i 混淆
+            Fraction factor = mat.at(k, lead); // 要消去的元素
             if (factor != Fraction(0)) {
-                Fraction pivot = mat.at(r, lead);
-                // 直接计算消元系数，无需先将主元归一
-                Fraction elimFactor = -factor / pivot;
-                addScaledRow(mat, i, r, elimFactor, history);
+                Fraction pivotForElimination = mat.at(r, lead); // 此处主元应为整数或已处理过的形式
+                if (pivotForElimination == Fraction(0)) {
+                    // 这种情况理论上不应发生，因为我们已经找到了非零主元并可能对其进行了缩放
+                    // 但为防止除以零，添加检查
+                    throw std::logic_error("Pivot for elimination is zero, which should not happen here.");
+                }
+                // 直接计算消元系数
+                Fraction elimFactor = -factor / pivotForElimination;
+                addScaledRow(mat, k, r, elimFactor, history);
             }
         }
         

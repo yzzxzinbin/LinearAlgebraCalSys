@@ -88,6 +88,15 @@ public:
     // 新增：清除当前历史记录
     void clearCurrentHistories();
 
+    // 新增：清除所有变量
+    void clearVariables();
+
+    // 新增：删除指定变量
+    void deleteVariable(const std::string& name);
+
+    // 新增：重命名变量
+    void renameVariable(const std::string& oldName, const std::string& newName);
+
     // 修改：导出和导入变量的方法签名
     std::string exportVariables(const std::string& filename, const std::deque<std::string>& commandHistory);
     std::pair<std::string, std::vector<std::string>> importVariables(const std::string& filename);

@@ -27,8 +27,8 @@ const std::vector<std::string> TuiApp::KNOWN_FUNCTIONS = {
 };
 
 const std::vector<std::string> TuiApp::KNOWN_COMMANDS = {
-    "help", "clear", "vars", "show", "exit", "steps", "new", "edit", "export", "import"
-    // 可以根据实际情况添加更多命令
+    "help", "clear", "vars", "show", "exit", "steps", "new", "edit", "export", "import",
+    "del", "rename" // 新增 "del" 和 "rename"
 };
 
 
@@ -498,6 +498,49 @@ void TuiApp::executeCommand(const std::string &input)
             commandStr.pop_back();
         }
 
+        // 处理clear命令
+        if (commandStr == "clear") {
+            if (commandArgs.empty()) {
+                // clear (无参数): 清屏
+                initUI();
+                statusMessage = "屏幕已清除";
+            } else if (commandArgs.size() == 1) {
+                if (commandArgs[0] == "-v") {
+                    interpreter.clearVariables();
+                    printToResultView("所有变量已清除。", Color::YELLOW);
+                    statusMessage = "所有变量已清除";
+                } else if (commandArgs[0] == "-h") {
+                    history.clear();
+                    historyIndex = 0;
+                    tempInputBuffer.clear();
+                    printToResultView("命令历史已清除。", Color::YELLOW);
+                    statusMessage = "命令历史已清除";
+                } else if (commandArgs[0] == "-v") {
+                    // clear -v: 清除所有变量
+                    // 注意: Interpreter 类需要有 clearVariables 方法
+                    interpreter.clearVariables(); 
+                    printToResultView("所有变量已清除。", Color::YELLOW);
+                    statusMessage = "所有变量已清除";
+                } else if (commandArgs[0] == "-a") {
+                    // clear -a: 清屏、清除历史、清除变量
+                    initUI(); // 清屏
+                    history.clear();
+                    historyIndex = 0;
+                    tempInputBuffer.clear();
+                    interpreter.clearVariables(); // 清除变量
+                    // printToResultView 在 initUI 中已被调用来清空区域，这里可以不再打印特定消息到结果区
+                    // 或者可以打印一个总结性消息
+                    printToResultView("已恢复初始状态 (屏幕、历史、变量已清除)。", Color::YELLOW);
+                    statusMessage = "已恢复初始状态";
+                } else {
+                    throw std::invalid_argument("无效的 clear 命令参数。用法: clear [-h | -v | -a]");
+                }
+            } else {
+                throw std::invalid_argument("无效的 clear 命令参数。用法: clear [-h | -v | -a]");
+            }
+            return; // clear 命令处理完毕
+        }
+
 
         // 处理new命令
         if (commandStr == "new") {
@@ -682,14 +725,7 @@ void TuiApp::executeCommand(const std::string &input)
             return;
         }
 
-        // 处理clear命令
-        if (processedInput == "clear" || processedInput == "clear;")
-        {
-            // 清除整个屏幕并重绘UI
-            initUI();
-            statusMessage = "屏幕已清除";
-            return;
-        }
+        // 旧的 clear 命令处理逻辑已移到前面并扩展
 
         // 处理vars命令
         if (processedInput == "vars" || processedInput == "vars;")
@@ -876,16 +912,16 @@ void TuiApp::showHelp()
     std::cout << "  help                           - 显示此帮助信息\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
-    std::cout << "  clear                          - 清屏\n";
+    std::cout << "  clear -h/-v/-a(可选)                  - 清屏/清除历史/清除变量/全部清除\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
     std::cout << "  vars                           - 显示所有变量\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
-    std::cout << "  show <变量名> -f<精度>(可选)   - 以有效数字格式显示变量\n";
+    std::cout << "  show <变量名> -f<精度>(可选) -r<结果变量名>(可选)  - 以有效数字格式显示变量\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
-    std::cout << "  show <变量名> -p<精度>(可选)   - 以小数位数格式显示变量\n";
+    std::cout << "  show <变量名> -p<精度>(可选) -r<结果变量名>(可选)  - 以小数位数格式显示变量\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
     std::cout << "  exit                           - 退出程序\n";   
@@ -930,9 +966,6 @@ void TuiApp::showHelp()
     std::cout << "  矩阵: m3 = m1 + m2, m3 = m1 - m2, m3 = m1 * m2 (矩阵乘法)\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
-    std::cout << "        m1 = m2 * f1 (数乘), m1 = f1 * m2 (数乘)\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
     std::cout << "  向量: v3 = v1 + v2, v3 = v1 - v2\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
@@ -940,12 +973,6 @@ void TuiApp::showHelp()
     resultRow++;
     Terminal::setCursor(resultRow, 0);
     std::cout << "        v_cross = v1 x v2  - 向量叉积 (返回向量, 仅3D)\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "        v1 = v2 * f1 (数乘), v1 = f1 * v2 (数乘)\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  分数: f3 = f1 + f2, f3 = f1 - f2, f3 = f1 * f2, f3 = f1 / f2\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
     std::cout << "\n";
@@ -1105,7 +1132,7 @@ void TuiApp::navigateHistory(bool up)
             currentInput = history[historyIndex - 1];
             cursorPosition = currentInput.length(); // 光标移到末尾
         } else if (historyIndex == 1) { // 到达历史记录的“底部”，恢复之前暂存的输入
-            historyIndex = 0;
+                    historyIndex = 0;
             currentInput = tempInputBuffer;
             // tempInputBuffer.clear(); // 不立即清除，以便再次向上时能恢复
             cursorPosition = currentInput.length(); // 光标移到末尾
@@ -1172,7 +1199,7 @@ void TuiApp::drawInputPrompt()
 
     if (cursorPosition < currentInput.length()) {
         std::cout << currentInput[cursorPosition];
-    } else {
+                } else {
         std::cout << " "; // 如果光标在末尾，显示一个空格作为光标块
     }
     
@@ -1342,7 +1369,7 @@ void TuiApp::showVariableWithFormat(const std::string &varName, int precision, b
                     std::stringstream ss;
                     ss << std::scientific << std::setprecision(precision - 1) << fval;
                     return ss.str();
-                } else {
+            } else {
                     // 直接显示整数
                     return intStr;
                 }
