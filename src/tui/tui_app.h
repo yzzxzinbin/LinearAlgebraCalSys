@@ -80,10 +80,10 @@ private:
     // 命令执行函数
     void showHelp();
     void showVariables();
-    void showVariable(const std::string &varName);
-    void showVariableWithFormat(const std::string &varName, int precision); // -f 选项：有效数字
-    void showVariableWithDecimalFormat(const std::string &varName, int decimalPlaces); // -p 选项：小数位数
-    void showVariableWithHighPrecision(const std::string &varName, int precision, int floatPrecision);
+    void showVariable(const std::string& varName);
+    void showVariableWithFormat(const std::string& varName, int precision, bool saveResult = false, const std::string& resultVarName = ""); // -f 选项：有效数字
+    void showVariableWithDecimalFormat(const std::string& varName, int decimalPlaces, bool saveResult = false, const std::string& resultVarName = ""); // -p 选项：小数位数
+    void showVariableWithHighPrecision(const std::string& varName, int precision, int floatPrecision);
     
     template<typename HighPrecFloat>
     void displayWithPrecision(const Variable& var, int precision);

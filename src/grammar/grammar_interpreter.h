@@ -8,6 +8,7 @@
 #include "../matrix.h"
 #include "../vector.h"
 #include "../fraction.h"
+#include "../result.h"  // 新增：包含Result头文件
 #include "../matrix_operations.h"
 #include "../operation_step.h"
 #include "../determinant_expansion.h"
@@ -16,7 +17,8 @@
 enum class VariableType {
     FRACTION,
     VECTOR,
-    MATRIX
+    MATRIX,
+    RESULT  // 新增：Result类型
 };
 
 // 变量存储
@@ -25,15 +27,18 @@ struct Variable {
     Fraction fractionValue;
     Vector vectorValue;
     Matrix matrixValue;
+    Result resultValue;  // 新增：Result值
     
     // 构造函数
-    Variable() : type(VariableType::FRACTION), fractionValue(0), vectorValue(0), matrixValue(0, 0) {}
+    Variable() : type(VariableType::FRACTION), fractionValue(0), vectorValue(0), matrixValue(0, 0), resultValue() {}
     
-    Variable(const Fraction& f) : type(VariableType::FRACTION), fractionValue(f), vectorValue(0), matrixValue(0, 0) {}
+    Variable(const Fraction& f) : type(VariableType::FRACTION), fractionValue(f), vectorValue(0), matrixValue(0, 0), resultValue() {}
     
-    Variable(const Vector& v) : type(VariableType::VECTOR), vectorValue(v), matrixValue(0, 0) {}
+    Variable(const Vector& v) : type(VariableType::VECTOR), vectorValue(v), matrixValue(0, 0), resultValue() {}
     
-    Variable(const Matrix& m) : type(VariableType::MATRIX), vectorValue(0), matrixValue(m) {}
+    Variable(const Matrix& m) : type(VariableType::MATRIX), vectorValue(0), matrixValue(m), resultValue() {}
+    
+    Variable(const Result& r) : type(VariableType::RESULT), vectorValue(0), matrixValue(0, 0), resultValue(r) {}  // 新增：Result构造函数
 };
 
 // 解释器类

@@ -614,10 +614,12 @@ void TuiApp::executeCommand(const std::string &input)
             
             bool useFloat = false;
             bool useDecimal = false;
+            bool saveResult = false;
+            std::string resultVarName;
             int precision = 2; // 默认精度
             
             // 检查是否有更多参数
-            if (iss >> option) {
+            while (iss >> option) {
                 // 检查是否是 -f 选项 (有效数字)
                 if (option.substr(0, 2) == "-f") {
                     useFloat = true;
@@ -645,13 +647,27 @@ void TuiApp::executeCommand(const std::string &input)
                         precision = 0; // 默认为整数显示
                     }
                 }
+                // 检查是否是 -r 选项 (保存结果)
+                else if (option.substr(0, 2) == "-r") {
+                    saveResult = true;
+                    if (option.length() > 2) {
+                        resultVarName = option.substr(2);
+                    } else {
+                        // 如果-r后没有变量名，尝试读取下一个参数
+                        if (iss >> option) {
+                            resultVarName = option;
+                        } else {
+                            throw std::invalid_argument("-r 选项需要指定结果变量名");
+                        }
+                    }
+                }
             }
             
             // 根据选项显示变量
             if (useFloat) {
-                showVariableWithFormat(varName, precision);
+                showVariableWithFormat(varName, precision, saveResult, resultVarName);
             } else if (useDecimal) {
-                showVariableWithDecimalFormat(varName, precision);
+                showVariableWithDecimalFormat(varName, precision, saveResult, resultVarName);
             } else {
                 showVariable(varName);
             }
@@ -1262,12 +1278,16 @@ void TuiApp::showVariable(const std::string &varName)
             }
         }
         break;
+    case VariableType::RESULT:  // 新增：处理Result类型
+        std::cout << it->second.resultValue << std::endl;
+        resultRow++;
+        break;
     }
     Terminal::resetColor();
     statusMessage = "显示变量: " + varName;
 }
 
-void TuiApp::showVariableWithFormat(const std::string &varName, int precision) {
+void TuiApp::showVariableWithFormat(const std::string &varName, int precision, bool saveResult, const std::string& resultVarName) {
     if (matrixEditor) return; // 不在编辑器模式下显示变量
     const auto &vars = interpreter.getVariables();
     auto it = vars.find(varName);
@@ -1363,49 +1383,81 @@ void TuiApp::showVariableWithFormat(const std::string &varName, int precision) {
         }
     };
 
+    Result result;
+    
     switch (it->second.type) {
     case VariableType::FRACTION:
         {
             std::string formattedValue = formatValue(it->second.fractionValue);
             std::cout << formattedValue << std::endl;
             resultRow++;
+            if (saveResult) {
+                result = Result(formattedValue);
+            }
         }
         break;
     case VariableType::VECTOR:
-        std::cout << "[";
-        for (size_t i = 0; i < it->second.vectorValue.size(); ++i) {
-            std::string formattedValue = formatValue(it->second.vectorValue.at(i));
-            std::cout << formattedValue;
-            
-            if (i < it->second.vectorValue.size() - 1) {
-                std::cout << ", ";
+        {
+            std::cout << "[";
+            std::vector<std::string> formattedValues;
+            for (size_t i = 0; i < it->second.vectorValue.size(); ++i) {
+                std::string formattedValue = formatValue(it->second.vectorValue.at(i));
+                std::cout << formattedValue;
+                formattedValues.push_back(formattedValue);
+                
+                if (i < it->second.vectorValue.size() - 1) {
+                    std::cout << ", ";
+                }
+            }
+            std::cout << "]" << std::endl;
+            resultRow++;
+            if (saveResult) {
+                result = Result(formattedValues);
             }
         }
-        std::cout << "]" << std::endl;
-        resultRow++;
         break;
     case VariableType::MATRIX:
-        std::cout << "\n"; // 为 "m = " 和矩阵内容之间提供一行间隔
-        resultRow++;
-        
-        for (size_t r = 0; r < it->second.matrixValue.rowCount(); ++r) {
-            Terminal::setCursor(resultRow, 0);
-            std::cout << "| ";
-            for (size_t c = 0; c < it->second.matrixValue.colCount(); ++c) {
-                std::string formattedValue = formatValue(it->second.matrixValue.at(r, c));
-                std::cout << std::setw(12) << formattedValue << " "; // 增加列宽以适应科学计数法
-            }
-            std::cout << "|" << std::endl;
+        {
+            std::cout << "\n"; // 为 "m = " 和矩阵内容之间提供一行间隔
             resultRow++;
+            
+            std::vector<std::vector<std::string>> formattedMatrix;
+            for (size_t r = 0; r < it->second.matrixValue.rowCount(); ++r) {
+                Terminal::setCursor(resultRow, 0);
+                std::cout << "| ";
+                std::vector<std::string> row;
+                for (size_t c = 0; c < it->second.matrixValue.colCount(); ++c) {
+                    std::string formattedValue = formatValue(it->second.matrixValue.at(r, c));
+                    std::cout << std::setw(12) << formattedValue << " ";
+                    row.push_back(formattedValue);
+                }
+                std::cout << "|" << std::endl;
+                resultRow++;
+                formattedMatrix.push_back(row);
+            }
+            if (saveResult) {
+                result = Result(formattedMatrix);
+            }
         }
+        break;
+    case VariableType::RESULT:
+        std::cout << it->second.resultValue << std::endl;
+        resultRow++;
         break;
     }
 
+    // 如果需要保存结果，将其存储到指定变量
+    if (saveResult && !resultVarName.empty()) {
+        interpreter.getVariablesNonConst()[resultVarName] = Variable(result);
+        statusMessage = "以 " + std::to_string(precision) + " 位有效数字显示变量: " + varName + "，结果已保存到: " + resultVarName;
+    } else {
+        statusMessage = "以 " + std::to_string(precision) + " 位有效数字显示变量: " + varName;
+    }
+
     Terminal::resetColor();
-    statusMessage = "以 " + std::to_string(precision) + " 位有效数字显示变量: " + varName;
 }
 
-void TuiApp::showVariableWithDecimalFormat(const std::string &varName, int decimalPlaces) {
+void TuiApp::showVariableWithDecimalFormat(const std::string &varName, int decimalPlaces, bool saveResult, const std::string& resultVarName) {
     if (matrixEditor) return; // 不在编辑器模式下显示变量
     const auto &vars = interpreter.getVariables();
     auto it = vars.find(varName);
@@ -1466,47 +1518,79 @@ void TuiApp::showVariableWithDecimalFormat(const std::string &varName, int decim
         }
     };
 
+    Result result;
+
     switch (it->second.type) {
     case VariableType::FRACTION:
         {
             std::string formattedValue = formatValueDecimal(it->second.fractionValue);
             std::cout << formattedValue << std::endl;
             resultRow++;
+            if (saveResult) {
+                result = Result(formattedValue);
+            }
         }
         break;
     case VariableType::VECTOR:
-        std::cout << "[";
-        for (size_t i = 0; i < it->second.vectorValue.size(); ++i) {
-            std::string formattedValue = formatValueDecimal(it->second.vectorValue.at(i));
-            std::cout << formattedValue;
-            
-            if (i < it->second.vectorValue.size() - 1) {
-                std::cout << ", ";
+        {
+            std::cout << "[";
+            std::vector<std::string> formattedValues;
+            for (size_t i = 0; i < it->second.vectorValue.size(); ++i) {
+                std::string formattedValue = formatValueDecimal(it->second.vectorValue.at(i));
+                std::cout << formattedValue;
+                formattedValues.push_back(formattedValue);
+                
+                if (i < it->second.vectorValue.size() - 1) {
+                    std::cout << ", ";
+                }
+            }
+            std::cout << "]" << std::endl;
+            resultRow++;
+            if (saveResult) {
+                result = Result(formattedValues);
             }
         }
-        std::cout << "]" << std::endl;
-        resultRow++;
         break;
     case VariableType::MATRIX:
-        std::cout << "\n"; // 为 "m = " 和矩阵内容之间提供一行间隔
-        resultRow++;
-        
-        for (size_t r = 0; r < it->second.matrixValue.rowCount(); ++r) {
-            Terminal::setCursor(resultRow, 0);
-            std::cout << "| ";
-            for (size_t c = 0; c < it->second.matrixValue.colCount(); ++c) {
-                std::string formattedValue = formatValueDecimal(it->second.matrixValue.at(r, c));
-                std::cout << std::setw(10) << formattedValue << " ";
-            }
-            std::cout << "|" << std::endl;
+        {
+            std::cout << "\n"; // 为 "m = " 和矩阵内容之间提供一行间隔
             resultRow++;
+            
+            std::vector<std::vector<std::string>> formattedMatrix;
+            for (size_t r = 0; r < it->second.matrixValue.rowCount(); ++r) {
+                Terminal::setCursor(resultRow, 0);
+                std::cout << "| ";
+                std::vector<std::string> row;
+                for (size_t c = 0; c < it->second.matrixValue.colCount(); ++c) {
+                    std::string formattedValue = formatValueDecimal(it->second.matrixValue.at(r, c));
+                    std::cout << std::setw(10) << formattedValue << " ";
+                    row.push_back(formattedValue);
+                }
+                std::cout << "|" << std::endl;
+                resultRow++;
+                formattedMatrix.push_back(row);
+            }
+            if (saveResult) {
+                result = Result(formattedMatrix);
+            }
         }
+        break;
+    case VariableType::RESULT:
+        std::cout << it->second.resultValue << std::endl;
+        resultRow++;
         break;
     }
 
+    // 如果需要保存结果，将其存储到指定变量
+    if (saveResult && !resultVarName.empty()) {
+        interpreter.getVariablesNonConst()[resultVarName] = Variable(result);
+        std::string formatDesc = (decimalPlaces == 0) ? "整数格式" : (std::to_string(decimalPlaces) + " 位小数");
+        statusMessage = "以 " + formatDesc + " 显示变量: " + varName + "，结果已保存到: " + resultVarName;
+    } else {
+        std::string formatDesc = (decimalPlaces == 0) ? "整数格式" : (std::to_string(decimalPlaces) + " 位小数");
+        statusMessage = "以 " + formatDesc + " 显示变量: " + varName;
+    }
     Terminal::resetColor();
-    std::string formatDesc = (decimalPlaces == 0) ? "整数格式" : (std::to_string(decimalPlaces) + " 位小数");
-    statusMessage = "以 " + formatDesc + " 显示变量: " + varName;
 }
 
 void TuiApp::drawResultArea()

@@ -71,6 +71,9 @@ std::string Interpreter::serializeVariable(const std::string &name, const Variab
             }
         }
         break;
+    case VariableType::RESULT:  // 新增：序列化Result类型
+        oss << "RESULT:" << var.resultValue.serialize();
+        break;
     }
     return oss.str();
 }
@@ -225,6 +228,10 @@ std::pair<std::string, Variable> Interpreter::deserializeLine(const std::string 
             }
         }
         var = Variable(mat);
+    }
+    else if (typeStr == "RESULT")  // 新增：反序列化Result类型
+    {
+        var = Variable(Result::deserialize(dataStr));
     }
     else
     {
