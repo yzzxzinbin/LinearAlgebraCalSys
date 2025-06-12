@@ -17,6 +17,11 @@
 // 最大历史记录数量
 const int MAX_HISTORY = 50;
 
+// 输出区域的布局常量
+const int RESULT_AREA_TITLE_ROW = 2; // "输出区域:" 标题所在的行 (0-indexed)
+const int RESULT_AREA_CONTENT_START_ROW = RESULT_AREA_TITLE_ROW + 1; // 实际内容开始的第一行
+const int MATRIX_EDITOR_CELL_WIDTH = 8; // 矩阵编辑器单元格宽度
+
 class TuiApp {
 private:
     // 窗口和UI状态
