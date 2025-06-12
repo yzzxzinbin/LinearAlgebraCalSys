@@ -170,7 +170,7 @@ std::string Result::toCsvString() const {
     std::ostringstream oss;
     switch (type_) {
         case Type::SCALAR:
-            oss << scalarValue_;
+            oss << "\"" << scalarValue_ << "\""; // 将标量值用引号括起来
             break;
         case Type::VECTOR:
             for (size_t i = 0; i < vectorValues_.size(); ++i) {

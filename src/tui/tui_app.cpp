@@ -579,12 +579,41 @@ void TuiApp::executeCommand(const std::string &input)
                 if (it == vars.end()) {
                     throw std::runtime_error("变量 '" + varName + "' 未定义。");
                 }
-                if (it->second.type != VariableType::RESULT) {
-                    throw std::runtime_error("变量 '" + varName + "' 不是一个Result类型，无法导出为CSV。");
-                }
 
-                const Result& resultToExport = it->second.resultValue;
-                std::string csvData = resultToExport.toCsvString();
+                std::string csvData;
+                VariableType varType = it->second.type;
+
+                if (varType == VariableType::MATRIX) {
+                    const Matrix& matrixToExport = it->second.matrixValue;
+                    std::ostringstream oss;
+                    for (size_t r = 0; r < matrixToExport.rowCount(); ++r) {
+                        for (size_t c = 0; c < matrixToExport.colCount(); ++c) {
+                            oss << matrixToExport.at(r, c); // 直接输出分数，不加引号
+                            if (c < matrixToExport.colCount() - 1) {
+                                oss << ",";
+                            }
+                        }
+                        if (r < matrixToExport.rowCount() - 1) {
+                            oss << "\n";
+                        }
+                    }
+                    csvData = oss.str();
+                } else if (varType == VariableType::VECTOR) {
+                    const Vector& vectorToExport = it->second.vectorValue;
+                    std::ostringstream oss;
+                    for (size_t i = 0; i < vectorToExport.size(); ++i) {
+                        oss << vectorToExport.at(i); // 直接输出分数，不加引号
+                        if (i < vectorToExport.size() - 1) {
+                            oss << ",";
+                        }
+                    }
+                    csvData = oss.str();
+                } else if (varType == VariableType::RESULT) {
+                    const Result& resultToExport = it->second.resultValue;
+                    csvData = resultToExport.toCsvString(); // Result::toCsvString 已修改为不加引号
+                } else {
+                    throw std::runtime_error("变量 '" + varName + "' 不是 Matrix, Vector, 或 Result 类型，无法导出为CSV。");
+                }
                 
                 std::string filename = varName + ".csv";
                 std::ofstream outFile(filename);
@@ -598,7 +627,7 @@ void TuiApp::executeCommand(const std::string &input)
                 statusMessage = "变量 '" + varName + "' 已导出到 " + filename;
 
             } else {
-                throw std::runtime_error("csv 命令需要一个参数 (Result类型的变量名)。用法: csv <变量名>");
+                throw std::runtime_error("csv 命令需要一个参数 (Matrix, Vector 或 Result 类型的变量名)。用法: csv <变量名>");
             }
             return;
         }
@@ -1007,7 +1036,7 @@ void TuiApp::showHelp()
     std::cout << "  rename <旧变量名> <新变量名>   - 重命名指定的变量\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
-    std::cout << "  csv <变量名>                   - 将Result类型变量导出为CSV文件\n";
+    std::cout << "  csv <变量名>                   - 将 Matrix, Vector 或 Result 类型变量导出为CSV文件\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
     std::cout << "\n";
@@ -1728,6 +1757,7 @@ void TuiApp::enterStepDisplayMode(const ExpansionHistory& history) {
         matrixEditor.reset(); 
         initUI();
     }
+
     if (history.size() == 0) return;
     
     inStepDisplayMode = true;
