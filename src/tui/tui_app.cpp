@@ -28,7 +28,7 @@ const std::vector<std::string> TuiApp::KNOWN_FUNCTIONS = {
 
 const std::vector<std::string> TuiApp::KNOWN_COMMANDS = {
     "help", "clear", "vars", "show", "exit", "steps", "new", "edit", "export", "import",
-    "del", "rename" // 新增 "del" 和 "rename"
+    "del", "rename" // 确保 "del" 和 "rename" 已在此处
 };
 
 
@@ -541,6 +541,33 @@ void TuiApp::executeCommand(const std::string &input)
             return; // clear 命令处理完毕
         }
 
+        // 新增：处理del命令
+        if (commandStr == "del") {
+            if (commandArgs.size() == 1) {
+                const std::string& varNameToDelete = commandArgs[0];
+                interpreter.deleteVariable(varNameToDelete);
+                printToResultView("变量 '" + varNameToDelete + "' 已删除。", Color::YELLOW);
+                statusMessage = "变量 '" + varNameToDelete + "' 已删除。";
+            } else {
+                throw std::runtime_error("del 命令需要一个参数 (变量名)。用法: del <变量名>");
+            }
+            return;
+        }
+
+        // 新增：处理rename命令
+        if (commandStr == "rename") {
+            if (commandArgs.size() == 2) {
+                const std::string& oldName = commandArgs[0];
+                const std::string& newName = commandArgs[1];
+                interpreter.renameVariable(oldName, newName);
+                printToResultView("变量 '" + oldName + "' 已重命名为 '" + newName + "'。", Color::YELLOW);
+                statusMessage = "变量 '" + oldName + "' 已重命名为 '" + newName + "'。";
+            } else {
+                throw std::runtime_error("rename 命令需要两个参数 (旧变量名和新变量名)。用法: rename <旧变量名> <新变量名>");
+            }
+            return;
+        }
+
 
         // 处理new命令
         if (commandStr == "new") {
@@ -912,16 +939,13 @@ void TuiApp::showHelp()
     std::cout << "  help                           - 显示此帮助信息\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
-    std::cout << "  clear -h/-v/-a(可选)                  - 清屏/清除历史/清除变量/全部清除\n";
+    std::cout << "  clear [-h|-v|-a]               - 清屏/清除历史/清除变量/全部清除\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
     std::cout << "  vars                           - 显示所有变量\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
-    std::cout << "  show <变量名> -f<精度>(可选) -r<结果变量名>(可选)  - 以有效数字格式显示变量\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  show <变量名> -p<精度>(可选) -r<结果变量名>(可选)  - 以小数位数格式显示变量\n";
+    std::cout << "  show <变量名> [-f<精度>|-p<精度>] [-r <结果变量名>] - 显示变量(可选格式化)\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
     std::cout << "  exit                           - 退出程序\n";   
@@ -936,10 +960,16 @@ void TuiApp::showHelp()
     std::cout << "  edit <变量名>                  - 编辑已存在的矩阵或向量变量\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
-    std::cout << "  export <文件名>                - 导出所有变量到文件\n";
+    std::cout << "  export <文件名>                - 导出所有变量和历史到文件\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
-    std::cout << "  import <文件名>                - 从文件导入变量\n";
+    std::cout << "  import <文件名>                - 从文件导入变量和历史\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
+    std::cout << "  del <变量名>                   - 删除指定的变量\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
+    std::cout << "  rename <旧变量名> <新变量名>   - 重命名指定的变量\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
     std::cout << "\n";
@@ -1132,7 +1162,7 @@ void TuiApp::navigateHistory(bool up)
             currentInput = history[historyIndex - 1];
             cursorPosition = currentInput.length(); // 光标移到末尾
         } else if (historyIndex == 1) { // 到达历史记录的“底部”，恢复之前暂存的输入
-                    historyIndex = 0;
+            historyIndex = 0;
             currentInput = tempInputBuffer;
             // tempInputBuffer.clear(); // 不立即清除，以便再次向上时能恢复
             cursorPosition = currentInput.length(); // 光标移到末尾
