@@ -166,6 +166,37 @@ Result Result::deserialize(const std::string& data) {
     }
 }
 
+std::string Result::toCsvString() const {
+    std::ostringstream oss;
+    switch (type_) {
+        case Type::SCALAR:
+            oss << scalarValue_;
+            break;
+        case Type::VECTOR:
+            for (size_t i = 0; i < vectorValues_.size(); ++i) {
+                oss << "\"" << vectorValues_[i] << "\""; // Enclose in quotes for safety
+                if (i < vectorValues_.size() - 1) {
+                    oss << ",";
+                }
+            }
+            break;
+        case Type::MATRIX:
+            for (size_t r = 0; r < rows_; ++r) {
+                for (size_t c = 0; c < cols_; ++c) {
+                    oss << "\"" << matrixValues_[r][c] << "\""; // Enclose in quotes
+                    if (c < cols_ - 1) {
+                        oss << ",";
+                    }
+                }
+                if (r < rows_ - 1) {
+                    oss << "\n";
+                }
+            }
+            break;
+    }
+    return oss.str();
+}
+
 std::ostream& operator<<(std::ostream& os, const Result& result) {
     result.print(os);
     return os;

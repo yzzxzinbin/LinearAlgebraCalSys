@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <iomanip> 
 #include <cctype>
+#include <fstream> // 新增：用于文件操作
 #include <boost/lexical_cast.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp> // 新增：任意精度十进制浮点数
 #include "../utils/logger.h"
@@ -28,7 +29,7 @@ const std::vector<std::string> TuiApp::KNOWN_FUNCTIONS = {
 
 const std::vector<std::string> TuiApp::KNOWN_COMMANDS = {
     "help", "clear", "vars", "show", "exit", "steps", "new", "edit", "export", "import",
-    "del", "rename" // 确保 "del" 和 "rename" 已在此处
+    "del", "rename", "csv" 
 };
 
 
@@ -568,6 +569,40 @@ void TuiApp::executeCommand(const std::string &input)
             return;
         }
 
+        // 新增：处理csv命令
+        if (commandStr == "csv") {
+            if (commandArgs.size() == 1) {
+                const std::string& varName = commandArgs[0];
+                const auto& vars = interpreter.getVariables();
+                auto it = vars.find(varName);
+
+                if (it == vars.end()) {
+                    throw std::runtime_error("变量 '" + varName + "' 未定义。");
+                }
+                if (it->second.type != VariableType::RESULT) {
+                    throw std::runtime_error("变量 '" + varName + "' 不是一个Result类型，无法导出为CSV。");
+                }
+
+                const Result& resultToExport = it->second.resultValue;
+                std::string csvData = resultToExport.toCsvString();
+                
+                std::string filename = varName + ".csv";
+                std::ofstream outFile(filename);
+                if (!outFile.is_open()) {
+                    throw std::runtime_error("无法打开文件 '" + filename + "' 进行写入。");
+                }
+                outFile << csvData;
+                outFile.close();
+
+                printToResultView("变量 '" + varName + "' 已成功导出到 " + filename, Color::YELLOW);
+                statusMessage = "变量 '" + varName + "' 已导出到 " + filename;
+
+            } else {
+                throw std::runtime_error("csv 命令需要一个参数 (Result类型的变量名)。用法: csv <变量名>");
+            }
+            return;
+        }
+
 
         // 处理new命令
         if (commandStr == "new") {
@@ -970,6 +1005,9 @@ void TuiApp::showHelp()
     resultRow++;
     Terminal::setCursor(resultRow, 0);
     std::cout << "  rename <旧变量名> <新变量名>   - 重命名指定的变量\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
+    std::cout << "  csv <变量名>                   - 将Result类型变量导出为CSV文件\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
     std::cout << "\n";

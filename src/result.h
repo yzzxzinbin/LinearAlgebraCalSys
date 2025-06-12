@@ -48,6 +48,9 @@ public:
     std::string serialize() const;
     static Result deserialize(const std::string& data);
 
+    // CSV导出方法
+    std::string toCsvString() const;
+
     // 输出流运算符重载
     friend std::ostream& operator<<(std::ostream& os, const Result& result);
 };

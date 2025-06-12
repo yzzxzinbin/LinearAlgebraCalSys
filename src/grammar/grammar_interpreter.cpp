@@ -50,6 +50,9 @@ void Interpreter::executeCommand(const std::string& command, const std::vector<s
         std::cout << "  show <变量名>     - 显示特定变量的值\n";
         std::cout << "  exit             - 退出程序\n";
         std::cout << "  steps            - 显示计算步骤\n";
+        std::cout << "  export <文件名>  - 导出所有变量和历史到文件\n";
+        std::cout << "  import <文件名>  - 从文件导入变量和历史\n";
+        std::cout << "  csv <变量名>     - 将Result类型变量导出为CSV文件\n";
         std::cout << "\n";
         std::cout << "变量定义:\n";
         std::cout << "  m1 = [1,2,3;4,5,6] - 定义矩阵\n";
