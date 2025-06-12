@@ -11,7 +11,7 @@ void TuiApp::drawHeader()
     Terminal::setForeground(Color::CYAN);
     Terminal::setBackground(Color::BLUE);
 
-    std::string title = " 线性代数计算系统 v1.0 ";
+    std::string title = " 线性代数计算系统 v1.1 ";
     int padding = (terminalCols - title.length()) / 2;
 
     std::string header(terminalCols, ' ');

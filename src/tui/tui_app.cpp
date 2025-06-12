@@ -49,5 +49,5 @@ TuiApp::TuiApp()
     // this->resultRow = RESULT_AREA_CONTENT_START_ROW; // 将在 initUI -> drawResultArea -> clearResultArea 中设置
 
     // 初始状态消息
-    statusMessage = "欢迎使用线性代数计算系统! 输入 'help' 获取帮助。";
+    statusMessage = "欢迎使用线性代数辅助计算系统! 输入 'help' 获取帮助。";
 }

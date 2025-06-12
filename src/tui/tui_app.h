@@ -84,7 +84,7 @@ private:
     
     // 命令执行函数
     void showHelp();
-    void showVariables();
+    void showVariables(bool listOnly = false); // 添加参数，当为true时只显示变量名和类型
     void showVariable(const std::string& varName);
     void showVariableWithFormat(const std::string& varName, int precision, bool saveResult = false, const std::string& resultVarName = ""); // -f 选项：有效数字
     void showVariableWithDecimalFormat(const std::string& varName, int decimalPlaces, bool saveResult = false, const std::string& resultVarName = ""); // -p 选项：小数位数

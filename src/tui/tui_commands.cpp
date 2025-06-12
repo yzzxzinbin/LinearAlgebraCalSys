@@ -393,6 +393,12 @@ void TuiApp::executeCommand(const std::string &input)
             showVariables();
             return;
         }
+        // 添加对vars -l命令的处理
+        else if (processedInput == "vars -l" || processedInput == "vars -l;")
+        {
+            showVariables(true); // 传入true表示只列出变量名和类型
+            return;
+        }
 
         // 处理exit命令
         if (processedInput == "exit" || processedInput == "exit;")
@@ -682,7 +688,7 @@ void TuiApp::showHelp()
     statusMessage = "已显示帮助信息";
 }
 
-void TuiApp::showVariables()
+void TuiApp::showVariables(bool listOnly)
 {
     if (matrixEditor) return; // 不在编辑器模式下显示变量
     // resultRow 当前指向命令行的下一行
@@ -699,54 +705,104 @@ void TuiApp::showVariables()
     }
 
     Terminal::setForeground(Color::CYAN);
-    std::cout << "已定义的变量：\n";
+    if (listOnly) {
+        std::cout << "变量列表（名称和类型）：\n";
+    } else {
+        std::cout << "已定义的变量：\n";
+    }
     resultRow++;
 
     for (const auto &pair : vars)
     {
         Terminal::setCursor(resultRow, 0);
-        std::cout << "  " << pair.first << " = ";
-
+        
+        // 获取变量类型的字符串表示
+        std::string typeStr;
         switch (pair.second.type)
         {
         case VariableType::FRACTION:
-            std::cout << pair.second.fractionValue << "\n";
-            resultRow++;
+            typeStr = "分数";
             break;
         case VariableType::VECTOR:
-            pair.second.vectorValue.print();
-            std::cout << "\n";
-            resultRow++;
-            break;
-        case VariableType::MATRIX:
-            std::cout << "\n"; // 为 "m = " 和矩阵内容之间提供一行间隔
-            resultRow++; 
-            Terminal::setCursor(resultRow, 0); // 确保矩阵从新行开始
-            // 假设 matrixValue.print() 会自行处理多行打印，并返回打印的行数或我们手动计算
-            // 为简化，我们让 matrixValue.print() 直接打印，并手动增加 resultRow
-            // 或者，更好的方式是 matrixValue.print() 接受一个起始行参数
-            {
-                std::stringstream matrix_ss;
-                pair.second.matrixValue.print(matrix_ss);
-                std::string matrix_str = matrix_ss.str();
-                std::istringstream matrix_iss(matrix_str);
-                std::string matrix_line;
-                while(std::getline(matrix_iss, matrix_line)) {
-                    Terminal::setCursor(resultRow, 0);
-                    std::cout << "  " << matrix_line << "\n"; // 添加缩进
-                    resultRow++;
-                }
+            if (listOnly) {
+                // 为向量添加维度信息
+                size_t dim = pair.second.vectorValue.size();
+                typeStr = "向量 (" + std::to_string(dim) + "维)";
+            } else {
+                typeStr = "向量";
             }
             break;
-        case VariableType::RESULT:  // 新增：处理Result类型
-             std::cout << "\n"; 
-             std::cout << pair.second.resultValue << std::endl;
-             resultRow++;
-             break;
+        case VariableType::MATRIX:
+            if (listOnly) {
+                // 为矩阵添加行列信息
+                size_t rows = pair.second.matrixValue.rowCount();
+                size_t cols = pair.second.matrixValue.colCount();
+                typeStr = "矩阵 (" + std::to_string(rows) + "×" + std::to_string(cols) + ")";
+            } else {
+                typeStr = "矩阵";
+            }
+            break;
+        case VariableType::RESULT:
+            typeStr = "结果";
+            break;
+        default:
+            typeStr = "未知类型";
+        }
+        
+        if (listOnly) {
+            // 只显示变量名和类型
+            std::cout << "  " << pair.first << " : " << typeStr << "\n";
+            resultRow++;
+        } else {
+            // 显示完整内容（原有行为）
+            std::cout << "  " << pair.first << " = ";
+
+            switch (pair.second.type)
+            {
+            case VariableType::FRACTION:
+                std::cout << pair.second.fractionValue << "\n";
+                resultRow++;
+                break;
+            case VariableType::VECTOR:
+                pair.second.vectorValue.print();
+                std::cout << "\n";
+                resultRow++;
+                break;
+            case VariableType::MATRIX:
+                std::cout << "\n"; // 为 "m = " 和矩阵内容之间提供一行间隔
+                resultRow++; 
+                Terminal::setCursor(resultRow, 0); // 确保矩阵从新行开始
+                // 假设 matrixValue.print() 会自行处理多行打印，并返回打印的行数或我们手动计算
+                // 为简化，我们让 matrixValue.print() 直接打印，并手动增加 resultRow
+                // 或者，更好的方式是 matrixValue.print() 接受一个起始行参数
+                {
+                    std::stringstream matrix_ss;
+                    pair.second.matrixValue.print(matrix_ss);
+                    std::string matrix_str = matrix_ss.str();
+                    std::istringstream matrix_iss(matrix_str);
+                    std::string matrix_line;
+                    while(std::getline(matrix_iss, matrix_line)) {
+                        Terminal::setCursor(resultRow, 0);
+                        std::cout << "  " << matrix_line << "\n"; // 添加缩进
+                        resultRow++;
+                    }
+                }
+                break;
+            case VariableType::RESULT:  // 新增：处理Result类型
+                 std::cout << "\n"; 
+                 std::cout << pair.second.resultValue << std::endl;
+                 resultRow++;
+                 break;
+            }
         }
     }
     Terminal::resetColor();
-    statusMessage = "已显示变量列表";
+    
+    if (listOnly) {
+        statusMessage = "已显示变量列表（仅名称和类型）";
+    } else {
+        statusMessage = "已显示变量列表";
+    }
 }
 
 void TuiApp::showVariable(const std::string &varName)
