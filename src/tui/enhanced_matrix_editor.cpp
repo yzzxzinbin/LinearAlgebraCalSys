@@ -9,6 +9,7 @@ EnhancedMatrixEditor::EnhancedMatrixEditor(Variable& var, std::string varName, b
       cursorOnAddRow(false), cursorOnAddCol(false),
       terminalRows(termRows), terminalCols(termCols) {
     
+        std::iostream::sync_with_stdio(false); // 禁用同步以提高性能
     // 修改：如果矩阵/向量为空，默认选中添加行按钮
     if ((isMatrix && workingCopy.matrixValue.rowCount() == 0 && workingCopy.matrixValue.colCount() == 0) ||
         (!isMatrix && workingCopy.vectorValue.size() == 0)) {
@@ -18,7 +19,9 @@ EnhancedMatrixEditor::EnhancedMatrixEditor(Variable& var, std::string varName, b
     updateStatus("编辑模式：方向键移动，直接输入数字修改，CTRL+回车选择，ESC保存退出");
 }
 
-EnhancedMatrixEditor::~EnhancedMatrixEditor() {}
+EnhancedMatrixEditor::~EnhancedMatrixEditor() {
+    std::iostream::sync_with_stdio(true); // 恢复同步
+}
 
 void EnhancedMatrixEditor::updateStatus(const std::string& msg) {
     statusMessage = msg;

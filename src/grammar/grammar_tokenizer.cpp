@@ -13,7 +13,8 @@ static const std::unordered_map<std::string, bool> keywords = {
     {"new", true},
     {"edit", true},
     {"export", true}, // 新增关键字
-    {"import", true}  // 新增关键字
+    {"import", true},  // 新增关键字
+    {"csv",true}
 };
 
 Tokenizer::Tokenizer(const std::string& input) : input(input), position(0) {}
