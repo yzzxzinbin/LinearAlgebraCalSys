@@ -11,7 +11,7 @@
 const std::vector<std::string> TuiApp::KNOWN_FUNCTIONS = {
     "transpose", "inverse", "inverse_gauss", "det", "det_expansion",
     "rank", "ref", "rref", "cofactor_matrix", "adjugate",
-    "dot", "cross", "norm", "normalize"
+    "dot", "cross", "norm", "normalize", "diag" // 添加 diag
     // 可以根据实际情况添加更多函数
 };
 

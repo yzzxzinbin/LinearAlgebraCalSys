@@ -110,6 +110,8 @@ ref(A)                          # 行阶梯形变换
 rref(A)                         # 最简行阶梯形变换
 cofactor_matrix(A)              # 代数余子式矩阵
 adjugate(A)                     # 伴随矩阵
+diag(v1)                        # 使用向量v1的元素创建对角矩阵
+diag(f1, f2, f3)                # 使用分数f1, f2, f3创建对角矩阵
 ```
 
 #### 向量函数调用

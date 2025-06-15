@@ -680,6 +680,12 @@ void TuiApp::showHelp()
     resultRow++;
     Terminal::setCursor(resultRow, 0);
     std::cout << "  m2 = adjugate(m1)         - 计算伴随矩阵\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
+    std::cout << "  m_diag = diag(v1)         - 使用向量v1创建对角矩阵\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
+    std::cout << "  m_diag = diag(f1,f2,f3)   - 使用分数f1,f2,f3创建对角矩阵\n";
     // resultRow++; // 最后一行不需要再递增，除非后面还有输出
     std::cout << "\n"; // 确保最后有换行
     Terminal::resetColor();

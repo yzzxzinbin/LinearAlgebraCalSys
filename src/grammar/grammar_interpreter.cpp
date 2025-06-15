@@ -6,6 +6,7 @@
 #include <cctype>
 #include <fstream> // 用于文件操作
 #include "../utils/logger.h" // 用于日志记录
+#include "../similar_matrix_operations.h" // 新增包含
 
 Interpreter::Interpreter() : showSteps(false) {}
 
@@ -340,6 +341,30 @@ Variable Interpreter::executeFunctionCall(const FunctionCallNode* node) {
             throw std::runtime_error("normalize函数需要一个向量参数");
         }
         return Variable(args[0].vectorValue.normalize());
+    } else if (funcNameLower == "diag") {
+        if (args.empty()) {
+            throw std::runtime_error("diag函数需要至少一个参数 (对角线元素或向量)");
+        }
+        std::vector<Fraction> diagElements;
+        if (args.size() == 1 && args[0].type == VariableType::VECTOR) {
+            // diag(vector)
+            const Vector& v = args[0].vectorValue;
+            for (size_t i = 0; i < v.size(); ++i) {
+                diagElements.push_back(v.at(i));
+            }
+        } else {
+            // diag(f1, f2, ...)
+            for (const auto& arg : args) {
+                if (arg.type != VariableType::FRACTION) {
+                    throw std::runtime_error("diag函数的参数必须是分数或单个向量");
+                }
+                diagElements.push_back(arg.fractionValue);
+            }
+        }
+        if (diagElements.empty()) { 
+            throw std::runtime_error("diag函数需要有效的对角线元素");
+        }
+        return Variable(SimilarMatrixOperations::createDiagonalMatrix(diagElements));
     } else {
         throw std::runtime_error("未知函数: " + funcNameOriginal);
     }
