@@ -12,13 +12,15 @@
 #include "../matrix_operations.h"
 #include "../operation_step.h"
 #include "../determinant_expansion.h"
+#include "../equationset.h"  // 新增：包含方程组求解头文件
 
 // 变量类型
 enum class VariableType {
     FRACTION,
     VECTOR,
     MATRIX,
-    RESULT  // 新增：Result类型
+    RESULT,  // 新增：Result类型
+    EQUATION_SOLUTION  // 新增：方程组解类型
 };
 
 // 变量存储
@@ -28,17 +30,20 @@ struct Variable {
     Vector vectorValue;
     Matrix matrixValue;
     Result resultValue;  // 新增：Result值
+    EquationSolution equationSolutionValue;  // 新增：方程组解值
     
     // 构造函数
-    Variable() : type(VariableType::FRACTION), fractionValue(0), vectorValue(0), matrixValue(0, 0), resultValue() {}
+    Variable() : type(VariableType::FRACTION), fractionValue(0), vectorValue(0), matrixValue(0, 0), resultValue(), equationSolutionValue() {}
     
-    Variable(const Fraction& f) : type(VariableType::FRACTION), fractionValue(f), vectorValue(0), matrixValue(0, 0), resultValue() {}
+    Variable(const Fraction& f) : type(VariableType::FRACTION), fractionValue(f), vectorValue(0), matrixValue(0, 0), resultValue(), equationSolutionValue() {}
     
-    Variable(const Vector& v) : type(VariableType::VECTOR), vectorValue(v), matrixValue(0, 0), resultValue() {}
+    Variable(const Vector& v) : type(VariableType::VECTOR), vectorValue(v), matrixValue(0, 0), resultValue(), equationSolutionValue() {}
     
-    Variable(const Matrix& m) : type(VariableType::MATRIX), vectorValue(0), matrixValue(m), resultValue() {}
+    Variable(const Matrix& m) : type(VariableType::MATRIX), vectorValue(0), matrixValue(m), resultValue(), equationSolutionValue() {}
     
-    Variable(const Result& r) : type(VariableType::RESULT), vectorValue(0), matrixValue(0, 0), resultValue(r) {}  // 新增：Result构造函数
+    Variable(const Result& r) : type(VariableType::RESULT), vectorValue(0), matrixValue(0, 0), resultValue(r), equationSolutionValue() {}  // 新增：Result构造函数
+    
+    Variable(const EquationSolution& es) : type(VariableType::EQUATION_SOLUTION), vectorValue(0), matrixValue(0, 0), resultValue(), equationSolutionValue(es) {}  // 新增：EquationSolution构造函数
 };
 
 // 解释器类

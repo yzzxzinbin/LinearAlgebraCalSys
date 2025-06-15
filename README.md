@@ -112,6 +112,26 @@ cofactor_matrix(A)              # 代数余子式矩阵
 adjugate(A)                     # 伴随矩阵
 diag(v1)                        # 使用向量v1的元素创建对角矩阵
 diag(f1, f2, f3)                # 使用分数f1, f2, f3创建对角矩阵
+solveq(A, b)                    # 求解线性方程组 Ax = b
+solveq(A)                       # 求解齐次线性方程组 Ax = 0
+```
+
+#### 线性方程组求解示例
+```plaintext
+# 定义系数矩阵和常数向量
+A = [2,3;1,-1]                  # 2x + 3y = 7, x - y = 1
+b = [7;1]                       # 常数向量
+
+# 求解非齐次方程组
+sol = solveq(A, b)              # 求解 Ax = b
+
+# 求解齐次方程组  
+sol_homo = solveq(A)            # 求解 Ax = 0
+
+# 系统会自动判断解的性质：
+# - 唯一解：rank(A) = rank([A|b]) = n
+# - 无穷多解：rank(A) = rank([A|b]) < n  
+# - 无解：rank(A) < rank([A|b])
 ```
 
 #### 向量函数调用

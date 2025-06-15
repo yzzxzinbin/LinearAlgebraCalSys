@@ -77,6 +77,8 @@ void Interpreter::executeCommand(const std::string& command, const std::vector<s
         std::cout << "  m2 = rref(m1)             - 最简行阶梯形\n";
         std::cout << "  m2 = cofactor_matrix(m1)  - 计算代数余子式矩阵\n";
         std::cout << "  m2 = adjugate(m1)         - 计算伴随矩阵\n";
+        std::cout << "  sol = solveq(A, b)        - 求解线性方程组 Ax=b\n";
+        std::cout << "  sol = solveq(A)           - 求解齐次方程组 Ax=0\n";
     } else if (commandLower == "clear") {
         // 清屏命令在应用程序中处理
     } else if (commandLower == "vars") {
@@ -99,6 +101,14 @@ void Interpreter::executeCommand(const std::string& command, const std::vector<s
                 case VariableType::MATRIX:
                     std::cout << "\n";
                     pair.second.matrixValue.print();
+                    break;
+                case VariableType::RESULT:  // 新增：处理Result类型
+                    std::cout << "\n";
+                    std::cout << pair.second.resultValue << std::endl;
+                    break;
+                case VariableType::EQUATION_SOLUTION:  // 新增：处理方程组解类型
+                    std::cout << "\n";
+                    pair.second.equationSolutionValue.print();
                     break;
             }
             
@@ -365,6 +375,24 @@ Variable Interpreter::executeFunctionCall(const FunctionCallNode* node) {
             throw std::runtime_error("diag函数需要有效的对角线元素");
         }
         return Variable(SimilarMatrixOperations::createDiagonalMatrix(diagElements));
+    } else if (funcNameLower == "solveq") {  // 新增：方程组求解函数
+        if (args.size() == 1 && args[0].type == VariableType::MATRIX) {
+            // 齐次方程组 Ax = 0
+            if (showSteps) {
+                return Variable(EquationSolver::solveHomogeneous(args[0].matrixValue, currentOpHistory_));
+            } else {
+                return Variable(EquationSolver::solveHomogeneous(args[0].matrixValue));
+            }
+        } else if (args.size() == 2 && args[0].type == VariableType::MATRIX && args[1].type == VariableType::MATRIX) {
+            // 非齐次方程组 Ax = b
+            if (showSteps) {
+                return Variable(EquationSolver::solve(args[0].matrixValue, args[1].matrixValue, currentOpHistory_));
+            } else {
+                return Variable(EquationSolver::solve(args[0].matrixValue, args[1].matrixValue));
+            }
+        } else {
+            throw std::runtime_error("solveq函数需要一个矩阵参数(齐次)或两个矩阵参数(非齐次)");
+        }
     } else {
         throw std::runtime_error("未知函数: " + funcNameOriginal);
     }

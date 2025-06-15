@@ -685,7 +685,7 @@ void TuiApp::showHelp()
     std::cout << "  m_diag = diag(v1)         - 使用向量v1创建对角矩阵\n";
     resultRow++;
     Terminal::setCursor(resultRow, 0);
-    std::cout << "  m_diag = diag(f1,f2,f3)   - 使用分数f1,f2,f3创建对角矩阵\n";
+    std::cout << "  sov = solveq(m1, v1)      - 求解方程组 Ax = b (v1可选)\n";
     // resultRow++; // 最后一行不需要再递增，除非后面还有输出
     std::cout << "\n"; // 确保最后有换行
     Terminal::resetColor();
@@ -720,6 +720,11 @@ void TuiApp::showVariables(bool listOnly)
 
     for (const auto &pair : vars)
     {
+        // 在非列表模式下跳过方程组解类型
+        if (!listOnly && pair.second.type == VariableType::EQUATION_SOLUTION) {
+            continue;
+        }
+
         Terminal::setCursor(resultRow, 0);
         
         // 获取变量类型的字符串表示
@@ -750,6 +755,13 @@ void TuiApp::showVariables(bool listOnly)
             break;
         case VariableType::RESULT:
             typeStr = "结果";
+            break;
+        case VariableType::EQUATION_SOLUTION:  // 新增：处理方程组解类型
+            if (listOnly) {
+                typeStr = "方程组解";
+            } else {
+                typeStr = "方程组解";
+            }
             break;
         default:
             typeStr = "未知类型";
@@ -798,6 +810,22 @@ void TuiApp::showVariables(bool listOnly)
                  std::cout << "\n"; 
                  std::cout << pair.second.resultValue << std::endl;
                  resultRow++;
+                 break;
+            case VariableType::EQUATION_SOLUTION:  // 新增：处理方程组解类型
+                 std::cout << "\n"; 
+                 resultRow++;
+                 {
+                     std::stringstream sol_ss;
+                     pair.second.equationSolutionValue.print(sol_ss);
+                     std::string sol_str = sol_ss.str();
+                     std::istringstream sol_iss(sol_str);
+                     std::string sol_line;
+                     while(std::getline(sol_iss, sol_line)) {
+                         Terminal::setCursor(resultRow, 0);
+                         std::cout << "  " << sol_line << "\n"; // 添加缩进
+                         resultRow++;
+                     }
+                 }
                  break;
             }
         }
@@ -867,6 +895,22 @@ void TuiApp::showVariable(const std::string &varName)
         std::cout << "\n"; // 为 "result = " 和结果内容之间提供一行间隔
         std::cout << it->second.resultValue << std::endl;
         resultRow++;
+        break;
+    case VariableType::EQUATION_SOLUTION:  // 新增：处理方程组解类型
+        std::cout << "\n"; // 为 "solution = " 和解内容之间提供一行间隔
+        resultRow++;
+        {
+            std::stringstream sol_ss;
+            it->second.equationSolutionValue.print(sol_ss);
+            std::string sol_str = sol_ss.str();
+            std::istringstream sol_iss(sol_str);
+            std::string sol_line;
+            while(std::getline(sol_iss, sol_line)) {
+                Terminal::setCursor(resultRow, 0);
+                std::cout << sol_line << std::endl;
+                resultRow++;
+            }
+        }
         break;
     }
     Terminal::resetColor();
