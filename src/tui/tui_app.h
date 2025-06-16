@@ -13,6 +13,8 @@
 #include "tui_terminal.h"
 #include "enhanced_matrix_editor.h"
 #include "tui_suggestion_box.h" // 新增：包含候选框头文件
+#include "../utils/logger.h" // 新增：包含日志记录头文件
+#include "../utils/tui_utils.h" // 新增：包含TUI工具函数头文件
 
 // 最大历史记录数量
 const int MAX_HISTORY = 50;
@@ -31,6 +33,7 @@ private:
     int resultRow; // 表示结果区域下一可用行
     size_t cursorPosition; // 新增：跟踪光标在currentInput中的位置
     int stepDisplayStartRow; // 新增: 步骤显示开始的行
+    std::string initialCommandToExecute; // 新增：存储启动时要执行的命令
     
     // 命令和历史记录
     std::string currentInput;
@@ -114,7 +117,7 @@ private:
                                                                             // wordStartPosInInput will be relative to currentInput string
     
 public:
-    TuiApp();
+    TuiApp(const std::string& initialCommand = ""); // 修改构造函数以接受初始命令
     void run();
     void initUI();
     void updateUI();

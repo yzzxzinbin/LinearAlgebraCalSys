@@ -6,6 +6,7 @@
 #include <deque>    // For std::deque in TuiApp member (history)
 #include <memory>   // For std::make_unique in constructor
 #include "../utils/logger.h" // For LOG_WARNING in constructor
+#include "startup_screen.h" // 新增：包含启动屏幕头文件 (如果TuiApp负责调用它)
 
 // 定义已知函数和命令列表
 const std::vector<std::string> TuiApp::KNOWN_FUNCTIONS = {
@@ -21,14 +22,15 @@ const std::vector<std::string> TuiApp::KNOWN_COMMANDS = {
 };
 
 
-TuiApp::TuiApp() 
+TuiApp::TuiApp(const std::string& initialCommand)  // 修改构造函数定义
     : historyIndex(0), running(true), 
       inStepDisplayMode(false), currentStep(0), totalSteps(0), isExpansionHistory(false),
       cursorPosition(0), 
       // 初始化新的编辑器指针为空
       matrixEditor(nullptr),
       suggestionBox(nullptr), // 初始化 suggestionBox
-      stepDisplayStartRow(0) // 初始化步骤显示起始行
+      stepDisplayStartRow(0), // 初始化步骤显示起始行
+      initialCommandToExecute(initialCommand) // 保存初始命令
 {
     // 初始化终端以支持ANSI转义序列
     if (!Terminal::init())
