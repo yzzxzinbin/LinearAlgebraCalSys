@@ -2,11 +2,12 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
-#include <algorithm>
+#include <algorithm> // 用于 std::transform 和 std::find
 #include <cctype>
 #include <fstream> // 用于文件操作
 #include "../utils/logger.h" // 用于日志记录
 #include "../similar_matrix_operations.h" // 新增包含
+#include "../tui/tui_app.h" // 新增包含以访问 TuiApp::KNOWN_COMMANDS
 
 Interpreter::Interpreter() : showSteps(false) {}
 
@@ -28,113 +29,37 @@ Variable Interpreter::execute(const std::unique_ptr<AstNode>& node) {
             return executeFunctionCall(static_cast<const FunctionCallNode*>(node.get()));
         case AstNodeType::ASSIGNMENT:
             return executeAssignment(static_cast<const AssignmentNode*>(node.get()));
-        case AstNodeType::COMMAND:
-            // 命令通常不返回值，这里返回一个默认的变量
-            executeCommand(static_cast<const CommandNode*>(node.get())->command, 
-                           static_cast<const CommandNode*>(node.get())->arguments);
-            return Variable();
-        default:
-            throw std::runtime_error("未知的节点类型");
-    }
-}
+        case AstNodeType::COMMAND: {
+            const auto* cmdNode = static_cast<const CommandNode*>(node.get());
+            std::string commandName = cmdNode->command;
+            const auto& commandArgs = cmdNode->arguments;
 
-void Interpreter::executeCommand(const std::string& command, const std::vector<std::string>& args) {
-    std::string commandLower = command;
-    std::transform(commandLower.begin(), commandLower.end(), commandLower.begin(),
-                   [](unsigned char c){ return std::tolower(c); });
+            std::string commandNameLower = commandName;
+            std::transform(commandNameLower.begin(), commandNameLower.end(), commandNameLower.begin(),
+                           [](unsigned char c){ return std::tolower(c); });
 
-    if (commandLower == "help") {
-        std::cout << "帮助信息：\n";
-        std::cout << "  help             - 显示此帮助信息\n";
-        std::cout << "  clear            - 清屏\n";
-        std::cout << "  vars             - 显示所有变量\n";
-        std::cout << "  show <变量名>     - 显示特定变量的值\n";
-        std::cout << "  exit             - 退出程序\n";
-        std::cout << "  steps            - 显示计算步骤\n";
-        std::cout << "  export <文件名>  - 导出所有变量和历史到文件\n";
-        std::cout << "  import <文件名>  - 从文件导入变量和历史\n";
-        std::cout << "  csv <变量名>     - 将Result类型变量导出为CSV文件\n";
-        std::cout << "\n";
-        std::cout << "变量定义:\n";
-        std::cout << "  m1 = [1,2,3;4,5,6] - 定义矩阵\n";
-        std::cout << "  v1 = [1,2,3]       - 定义向量\n";
-        std::cout << "  f1 = 3/4           - 定义分数\n";
-        std::cout << "\n";
-        std::cout << "基本运算:\n";
-        std::cout << "  m3 = m1 + m2       - 矩阵加法\n";
-        std::cout << "  m3 = m1 * m2       - 矩阵乘法\n";
-        std::cout << "  v3 = v1 + v2       - 向量加法\n";
-        std::cout << "  f3 = f1 * f2       - 分数乘法\n";
-        std::cout << "\n";
-        std::cout << "矩阵和向量函数:\n"; // 更新标题
-        std::cout << "  m2 = transpose(m1)        - 矩阵转置\n";
-        std::cout << "  m2 = inverse(m1)          - 计算逆矩阵(伴随矩阵法)\n";
-        std::cout << "  m2 = inverse_gauss(m1)    - 计算逆矩阵(高斯-若尔当法)\n";
-        std::cout << "  f1 = det(m1)              - 计算行列式\n";
-        std::cout << "  f1 = det_expansion(m1)    - 按行列展开计算行列式\n";
-        std::cout << "  f1 = rank(m1)             - 计算矩阵秩\n";
-        std::cout << "  m2 = ref(m1)              - 行阶梯形\n";
-        std::cout << "  m2 = rref(m1)             - 最简行阶梯形\n";
-        std::cout << "  m2 = cofactor_matrix(m1)  - 计算代数余子式矩阵\n";
-        std::cout << "  m2 = adjugate(m1)         - 计算伴随矩阵\n";
-        std::cout << "  m  = diag(v1)             - 从向量v1创建对角矩阵\n";
-        std::cout << "  m  = diag(m_col)          - 从单列矩阵m_col创建对角矩阵\n";
-        std::cout << "  m  = diag(f1, f2, ...)    - 用分数f1, f2等创建对角矩阵\n";
-        std::cout << "  f  = dot(v1, v2)          - 计算向量v1和v2的点积\n";
-        std::cout << "  v3 = cross(v1, v2)        - 计算三维向量v1和v2的叉积 (使用 'x' 运算符或函数)\n";
-        std::cout << "  sol = solveq(A, b)        - 求解线性方程组 Ax=b (b可以是列矩阵或向量)\n";
-        std::cout << "  sol = solveq(A)           - 求解齐次方程组 Ax=0\n";
-    } else if (commandLower == "clear") {
-        // 清屏命令在应用程序中处理
-    } else if (commandLower == "vars") {
-        if (variables.empty()) {
-            std::cout << "没有已定义的变量。\n";
-            return;
-        }
-        
-        std::cout << "已定义的变量：\n";
-        for (const auto& pair : variables) {
-            std::cout << "  " << pair.first << " = ";
-            
-            switch (pair.second.type) {
-                case VariableType::FRACTION:
-                    std::cout << pair.second.fractionValue;
-                    break;
-                case VariableType::VECTOR:
-                    pair.second.vectorValue.print();
-                    break;
-                case VariableType::MATRIX:
-                    std::cout << "\n";
-                    pair.second.matrixValue.print();
-                    break;
-                case VariableType::RESULT:  // 新增：处理Result类型
-                    std::cout << "\n";
-                    std::cout << pair.second.resultValue << std::endl;
-                    break;
-                case VariableType::EQUATION_SOLUTION:  // 新增：处理方程组解类型
-                    std::cout << "\n";
-                    pair.second.equationSolutionValue.print();
-                    break;
+            std::string delegationMessageStr = "DELEGATE_COMMAND:" + commandName; // 使用原始大小写的命令名
+
+            if (commandNameLower == "steps") {
+                this->showSteps = !this->showSteps; // 切换状态
+                delegationMessageStr += (this->showSteps ? " on" : " off");
+            } else {
+                // 如果不是 "steps"，继续检查命令是否在 TuiApp::KNOWN_COMMANDS 列表中
+                auto it = std::find(TuiApp::KNOWN_COMMANDS.begin(), TuiApp::KNOWN_COMMANDS.end(), commandNameLower);
+                if (it != TuiApp::KNOWN_COMMANDS.end()) {
+                    // 命令是已知的TUI命令，附加参数
+                    for (const auto& arg : commandArgs) {
+                        delegationMessageStr += " " + arg;
+                    }
+                } else {
+                    throw std::runtime_error("解释器接收到未知或无法处理的命令: " + commandName);
+                }
             }
             
-            std::cout << "\n";
+            return Variable(Result(delegationMessageStr));
         }
-    } else if (commandLower == "exit") {
-        // 退出命令在应用程序中处理
-    } else if (commandLower == "steps") {
-        showSteps = !showSteps;
-        std::cout << "计算步骤显示: " << (showSteps ? "开启" : "关闭") << "\n";
-    } else if (commandLower == "new" || commandLower == "edit") {
-        // 由 TuiApp 处理
-        // 这些命令主要用于触发 TuiApp 中的特定模式，而不是由解释器直接执行逻辑
-    } else if (commandLower == "export" || commandLower == "import") {
-        // 文件导出/导入命令由 TuiApp::executeCommand 直接调用 Interpreter 的
-        // exportVariables/importVariables 方法处理。
-        // Interpreter::executeCommand 本身不执行这些文件操作。
-        // 可以记录一个日志或什么都不做。
-        LOG_INFO("命令 '" + command + "' 已由 TuiApp 处理。");
-    } else {
-        throw std::runtime_error("未知命令: " + command);
+        default:
+            throw std::runtime_error("未知的节点类型");
     }
 }
 
@@ -552,18 +477,3 @@ Variable Interpreter::divide(const Variable& left, const Variable& right) {
     throw std::runtime_error("不支持的除法操作");
 }
 
-void Interpreter::displaySteps(const OperationHistory& history) {
-    for (size_t i = 0; i < history.size(); ++i) {
-        std::cout << "步骤 " << (i + 1) << ": ";
-        history.getStep(i).print(std::cout);
-        std::cout << std::endl;
-    }
-}
-
-void Interpreter::displaySteps(const ExpansionHistory& history) {
-    for (size_t i = 0; i < history.size(); ++i) {
-        std::cout << "步骤 " << (i + 1) << ": ";
-        history.getStep(i).print(std::cout);
-        std::cout << std::endl;
-    }
-}

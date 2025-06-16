@@ -808,8 +808,20 @@ void TuiApp::showVariables(bool listOnly)
                 break;
             case VariableType::RESULT:  // 新增：处理Result类型
                  std::cout << "\n"; 
-                 std::cout << pair.second.resultValue << std::endl;
-                 resultRow++;
+                 resultRow++; // 为 "name = " 和 Result 内容之间的空行增加 resultRow
+                 // 将 Result 对象的打印输出到 stringstream 以处理多行
+                 {
+                     std::stringstream result_ss;
+                     result_ss << pair.second.resultValue; // 使用 operator<<
+                     std::string result_str = result_ss.str();
+                     std::istringstream result_iss(result_str);
+                     std::string result_line;
+                     while(std::getline(result_iss, result_line)) {
+                         Terminal::setCursor(resultRow, 0);
+                         std::cout << "  " << result_line << "\n"; // 添加缩进
+                         resultRow++;
+                     }
+                 }
                  break;
             case VariableType::EQUATION_SOLUTION:  // 新增：处理方程组解类型
                  std::cout << "\n"; 
@@ -893,8 +905,20 @@ void TuiApp::showVariable(const std::string &varName)
         break;
     case VariableType::RESULT:  // 新增：处理Result类型
         std::cout << "\n"; // 为 "result = " 和结果内容之间提供一行间隔
-        std::cout << it->second.resultValue << std::endl;
-        resultRow++;
+        resultRow++; // 为 "name = " 和 Result 内容之间的空行增加 resultRow
+        // 将 Result 对象的打印输出到 stringstream 以处理多行
+        {
+            std::stringstream result_ss;
+            result_ss << it->second.resultValue; // 使用 operator<<
+            std::string result_str = result_ss.str();
+            std::istringstream result_iss(result_str);
+            std::string result_line;
+            while(std::getline(result_iss, result_line)) {
+                Terminal::setCursor(resultRow, 0);
+                std::cout << result_line << std::endl;
+                resultRow++;
+            }
+        }
         break;
     case VariableType::EQUATION_SOLUTION:  // 新增：处理方程组解类型
         std::cout << "\n"; // 为 "solution = " 和解内容之间提供一行间隔
@@ -1088,8 +1112,28 @@ void TuiApp::showVariableWithFormat(const std::string &varName, int precision, b
         }
         break;
     case VariableType::RESULT:
-        std::cout << it->second.resultValue << std::endl; // Result type already stringified
+        // Result 类型已经是字符串化表示，其 print 方法能处理多行
+        // 但 showVariableWithFormat/DecimalFormat 的目的是格式化 Fraction/Vector/Matrix
+        // Result 类型通常是这些格式化操作的目标，而不是源
+        // 如果确实要显示一个 Result 类型的变量，并且它可能是多行的，
+        // 这里的处理也需要像 showVariable 行为一致，通过 stringstream 逐行打印并更新 resultRow。
+        // 然而，当前 formatValue 和 formatValueDecimal 并不直接处理 Result 类型。
+        // 假设这里的 Result 是标量或单行向量，则当前逻辑没问题。
+        // 如果 Result 内部是 Matrix，则需要修改。
+        std::cout << "\n"; // 为 "name = " 和结果内容之间提供一行间隔
         resultRow++;
+        {
+            std::stringstream result_ss;
+            result_ss << it->second.resultValue;
+            std::string result_str = result_ss.str();
+            std::istringstream result_iss(result_str);
+            std::string result_line;
+            while(std::getline(result_iss, result_line)) {
+                Terminal::setCursor(resultRow, 0);
+                std::cout << result_line << std::endl;
+                resultRow++;
+            }
+        }
         // Optionally, allow re-saving a result if -r is used, though it's already a Result
         if (saveResult) {
             result_obj = it->second.resultValue; // Copy existing result
@@ -1210,8 +1254,21 @@ void TuiApp::showVariableWithDecimalFormat(const std::string &varName, int decim
         }
         break;
     case VariableType::RESULT:
-        std::cout << it->second.resultValue << std::endl;
+        // 与 showVariableWithFormat 中的 Result 处理类似
+        std::cout << "\n"; // 为 "name = " 和结果内容之间提供一行间隔
         resultRow++;
+        {
+            std::stringstream result_ss;
+            result_ss << it->second.resultValue;
+            std::string result_str = result_ss.str();
+            std::istringstream result_iss(result_str);
+            std::string result_line;
+            while(std::getline(result_iss, result_line)) {
+                Terminal::setCursor(resultRow, 0);
+                std::cout << result_line << std::endl;
+                resultRow++;
+            }
+        }
         if (saveResult) {
             result_obj = it->second.resultValue;
         }

@@ -69,9 +69,6 @@ public:
     // 执行语法树
     Variable execute(const std::unique_ptr<AstNode>& node);
     
-    // 执行命令
-    void executeCommand(const std::string& command, const std::vector<std::string>& args);
-    
     // 获取所有变量 (const 版本)
     const std::unordered_map<std::string, Variable>& getVariables() const;
     
@@ -123,7 +120,4 @@ private:
     Variable multiply(const Variable& left, const Variable& right);
     Variable divide(const Variable& left, const Variable& right);
     
-    // 显示步骤
-    void displaySteps(const OperationHistory& history);
-    void displaySteps(const ExpansionHistory& history);
 };
