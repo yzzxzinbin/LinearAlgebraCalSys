@@ -199,4 +199,57 @@ det(A);                         # 分号可选
 - **步骤显示模式**: 使用`steps`命令开启/关闭详细计算过程展示
 
 
+### 源代码目录
+LACS
+│  determinant_expansion.cpp
+│  determinant_expansion.h
+│  equationset.cpp
+│  equationset.h
+│  fraction.cpp
+│  fraction.h
+│  main.cpp
+│  matrix.cpp
+│  matrix.h
+│  matrix_operations.cpp
+│  matrix_operations.h
+│  operation_step.cpp
+│  operation_step.h
+│  result.cpp
+│  result.h
+│  similar_matrix_operations.cpp
+│  similar_matrix_operations.h
+│  vector.cpp
+│  vector.h
+│
+├─.vscode
+│      settings.json
+│
+├─grammar
+│      grammar_interpreter.cpp
+│      grammar_interpreter.h
+│      grammar_interpreter_file.cpp
+│      grammar_parser.cpp
+│      grammar_parser.h
+│      grammar_token.h
+│      grammar_tokenizer.cpp
+│      grammar_tokenizer.h
+│
+├─tui
+│      enhanced_matrix_editor.cpp
+│      enhanced_matrix_editor.h
+│      tui_app.cpp
+│      tui_app.h
+│      tui_commands.cpp
+│      tui_core.cpp
+│      tui_input.cpp
+│      tui_step_mode.cpp
+│      tui_suggestion_box.cpp
+│      tui_suggestion_box.h
+│      tui_terminal.cpp
+│      tui_terminal.h
+│      tui_utils.cpp
+│
+└─utils
+        logger.cpp
+        logger.h
 

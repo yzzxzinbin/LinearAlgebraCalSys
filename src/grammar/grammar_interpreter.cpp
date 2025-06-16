@@ -366,7 +366,13 @@ Variable Interpreter::executeFunctionCall(const FunctionCallNode* node) {
             // diag(f1, f2, ...)
             for (const auto& arg : args) {
                 if (arg.type != VariableType::FRACTION) {
-                    throw std::runtime_error("diag函数的参数必须是分数或单个向量");
+                    // 改进错误消息，提供更多上下文
+                    std::ostringstream error_msg;
+                    error_msg << "diag函数的参数必须是分数或单个向量。实际收到的参数类型 ID: " 
+                              << static_cast<int>(arg.type);
+                    // 此处可以根据 VariableType 枚举值转换为字符串表示，以提高可读性，
+                    // 但为保持简洁，暂时只输出整数 ID。
+                    throw std::runtime_error(error_msg.str());
                 }
                 diagElements.push_back(arg.fractionValue);
             }

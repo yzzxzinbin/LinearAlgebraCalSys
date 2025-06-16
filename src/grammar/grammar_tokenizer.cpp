@@ -72,7 +72,7 @@ Token Tokenizer::identifier() {
 
 Token Tokenizer::number() {
     try {
-        size_t start = position - 1;
+        size_t start = position;
         
         // 处理整数部分
         while (!isAtEnd() && std::isdigit(peek())) {
