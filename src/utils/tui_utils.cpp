@@ -68,13 +68,13 @@ void drawBox(int r, int c, int h, int w, const std::string& title, Color borderC
     if (h < 2 || w < 2) return;
 
     Terminal::setForeground(borderColor);
-    Terminal::setBackground(Color::BLACK); // Assuming black background for box lines
+    Terminal::setBackground(Color::DEFAULT); // Assuming black background for box lines
 
     // Corners
-    Terminal::setCursor(r, c); std::cout << "┌";
-    Terminal::setCursor(r, c + w - 1); std::cout << "┐";
-    Terminal::setCursor(r + h - 1, c); std::cout << "└";
-    Terminal::setCursor(r + h - 1, c + w - 1); std::cout << "┘";
+    Terminal::setCursor(r, c); std::cout << "╭";
+    Terminal::setCursor(r, c + w - 1); std::cout << "╮";
+    Terminal::setCursor(r + h - 1, c); std::cout << "╰";
+    Terminal::setCursor(r + h - 1, c + w - 1); std::cout << "╯";
 
     // Horizontal lines
     std::string hLine_char = "─"; // UTF-8 character for horizontal line

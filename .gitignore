@@ -1,6 +1,5 @@
 .vscode/
 *.xlsx
-*.txt
 /build
 /res
 /bin

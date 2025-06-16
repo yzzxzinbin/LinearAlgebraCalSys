@@ -27,6 +27,10 @@ private:
     int scrollOffset_;                  // 列表的滚动偏移量
     bool active_;                       // 控制启动界面循环
 
+    // 新增：用于检测终端尺寸变化的成员变量
+    int lastTermRows_;
+    int lastTermCols_;
+
     const std::string bannerFileConfigPath_; // 传入的banner文件路径 (可能相对)
     const std::string workDirConfigPath_;    // 传入的工作目录路径 (可能相对)
     static const std::string NULL_WORKSPACE_OPTION_TEXT; // 新增：NULL选项的文本
