@@ -2,11 +2,14 @@
 #include "matrix_operations.h"
 #include <sstream>
 #include <iomanip>
+#include <vector> // 新增
+#include <stdexcept> // 新增
 
 // EquationSolution 实现
 EquationSolution::EquationSolution() : type(SolutionType::UNDETERMINED),
                                      particularSolution(0, 0),
-                                     homogeneousSolutions(0, 0) {}
+                                     homogeneousSolutions(0, 0),
+                                     initialAugmentedMatrix(0,0) {} // 初始化新增成员
 
 void EquationSolution::setSolutionType(SolutionType t) {
     type = t;
@@ -26,6 +29,10 @@ void EquationSolution::setHomogeneousSolutions(const Matrix& solutions) {
 
 void EquationSolution::setDetailedDescription(const std::string& desc) {
     detailedDescription = desc;
+}
+
+void EquationSolution::setInitialAugmentedMatrix(const Matrix& augMatrix) { // 新增实现
+    initialAugmentedMatrix = augMatrix;
 }
 
 SolutionType EquationSolution::getSolutionType() const {
@@ -48,6 +55,10 @@ std::string EquationSolution::getDetailedDescription() const {
     return detailedDescription;
 }
 
+const Matrix& EquationSolution::getInitialAugmentedMatrix() const { // 新增实现
+    return initialAugmentedMatrix;
+}
+
 bool EquationSolution::hasSolution() const {
     return type != SolutionType::NO_SOLUTION;
 }
@@ -63,12 +74,14 @@ bool EquationSolution::hasInfiniteSolutions() const {
 void EquationSolution::print(std::ostream& os) const {
     os << "=== 线性方程组求解结果 ===\n\n";
     
-    // 输出系统信息
-    os << "方程组信息:\n";
-    os << "  方程个数: " << systemInfo.numEquations << "\n";
-    os << "  变量个数: " << systemInfo.numVariables << "\n";
-    os << "  系数矩阵的秩: " << systemInfo.coefficientRank << "\n";
-    os << "  增广矩阵的秩: " << systemInfo.augmentedRank << "\n\n";
+    // 输出系统信息 - 修改为显示初始增广矩阵
+    os << "方程组 (增广矩阵形式):\n";
+    if (initialAugmentedMatrix.rowCount() > 0 || initialAugmentedMatrix.colCount() > 0) {
+        initialAugmentedMatrix.print(os);
+    } else {
+        os << "  (未提供初始方程组矩阵)\n";
+    }
+    os << "\n";
     
     // 输出解的类型
     os << "解的性质: ";
@@ -106,9 +119,112 @@ void EquationSolution::print(std::ostream& os) const {
     }
     
     if (!detailedDescription.empty()) {
-        os << "\n详细说明:\n" << detailedDescription << "\n";
+        os << "\n详细说明:\n" << detailedDescription << "\n"; // 详细说明中已包含秩和变量数等信息
     }
 }
+
+// 辅助函数：分割字符串
+static std::vector<std::string> splitStringByDelimiter(const std::string& s, const std::string& delimiter) {
+    std::vector<std::string> tokens;
+    size_t start = 0;
+    size_t end = s.find(delimiter);
+    while (end != std::string::npos) {
+        tokens.push_back(s.substr(start, end - start));
+        start = end + delimiter.length();
+        end = s.find(delimiter, start);
+    }
+    tokens.push_back(s.substr(start)); // Add the last token
+    return tokens;
+}
+
+// 辅助函数：转义字符串中的特殊字符
+static const std::string EQ_SOL_DELIMITER = "<!EQ_FIELD_SEP!>";
+static const std::string ESCAPED_DELIMITER_REPR = "<!ESC_SEP!>"; // 表示转义后的分隔符
+static const std::string NEWLINE_REPR = "<!NL!>";             // 表示转义后的换行符
+
+static std::string escapeString(const std::string& s) {
+    std::string result = s;
+    // 1. 先替换分隔符本身
+    size_t pos = 0;
+    while ((pos = result.find(EQ_SOL_DELIMITER, pos)) != std::string::npos) {
+        result.replace(pos, EQ_SOL_DELIMITER.length(), ESCAPED_DELIMITER_REPR);
+        pos += ESCAPED_DELIMITER_REPR.length();
+    }
+    // 2. 再替换换行符
+    pos = 0;
+    while ((pos = result.find("\n", pos)) != std::string::npos) {
+        result.replace(pos, 1, NEWLINE_REPR);
+        pos += NEWLINE_REPR.length();
+    }
+    return result;
+}
+
+static std::string unescapeString(const std::string& s) {
+    std::string result = s;
+    // 1. 先还原换行符
+    size_t pos = 0;
+    while ((pos = result.find(NEWLINE_REPR, pos)) != std::string::npos) {
+        result.replace(pos, NEWLINE_REPR.length(), "\n");
+        pos += 1; 
+    }
+    // 2. 再还原分隔符
+    pos = 0;
+    while ((pos = result.find(ESCAPED_DELIMITER_REPR, pos)) != std::string::npos) {
+        result.replace(pos, ESCAPED_DELIMITER_REPR.length(), EQ_SOL_DELIMITER);
+        pos += EQ_SOL_DELIMITER.length();
+    }
+    return result;
+}
+
+
+std::string EquationSolution::serialize() const {
+    std::ostringstream oss;
+    oss << static_cast<int>(type) << EQ_SOL_DELIMITER;
+    oss << particularSolution.serialize() << EQ_SOL_DELIMITER;
+    oss << homogeneousSolutions.serialize() << EQ_SOL_DELIMITER;
+    oss << systemInfo.coefficientRank << EQ_SOL_DELIMITER;
+    oss << systemInfo.augmentedRank << EQ_SOL_DELIMITER;
+    oss << systemInfo.numVariables << EQ_SOL_DELIMITER;
+    oss << systemInfo.numEquations << EQ_SOL_DELIMITER;
+    oss << static_cast<int>(systemInfo.solutionType) << EQ_SOL_DELIMITER;
+    oss << escapeString(systemInfo.description) << EQ_SOL_DELIMITER;
+    oss << escapeString(detailedDescription) << EQ_SOL_DELIMITER;
+    oss << initialAugmentedMatrix.serialize();
+    return oss.str();
+}
+
+EquationSolution EquationSolution::deserialize(const std::string& s) {
+    std::vector<std::string> parts = splitStringByDelimiter(s, EQ_SOL_DELIMITER);
+
+    if (parts.size() != 11) { // 确保有11个部分
+        throw std::runtime_error("Invalid EquationSolution serialized string: incorrect number of parts. Expected 11, got " + std::to_string(parts.size()));
+    }
+
+    EquationSolution sol;
+    int partIdx = 0;
+    try {
+        sol.type = static_cast<SolutionType>(std::stoi(parts[partIdx++]));
+        sol.particularSolution = Matrix::deserialize(parts[partIdx++]);
+        sol.homogeneousSolutions = Matrix::deserialize(parts[partIdx++]);
+        
+        EquationSystemInfo sysInfo;
+        sysInfo.coefficientRank = std::stoi(parts[partIdx++]);
+        sysInfo.augmentedRank = std::stoi(parts[partIdx++]);
+        sysInfo.numVariables = std::stoi(parts[partIdx++]);
+        sysInfo.numEquations = std::stoi(parts[partIdx++]);
+        sysInfo.solutionType = static_cast<SolutionType>(std::stoi(parts[partIdx++]));
+        sysInfo.description = unescapeString(parts[partIdx++]);
+        sol.systemInfo = sysInfo;
+
+        sol.detailedDescription = unescapeString(parts[partIdx++]);
+        sol.initialAugmentedMatrix = Matrix::deserialize(parts[partIdx++]);
+
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Error deserializing EquationSolution part " + std::to_string(partIdx) + ": " + e.what() + ". Original string: " + s);
+    }
+    return sol;
+}
+
 
 // EquationSolver 实现
 
@@ -161,6 +277,8 @@ EquationSolution EquationSolver::solve(const Matrix& A, const Matrix& b, Operati
     
     // 创建增广矩阵 [A|b]
     Matrix augmented = A.augment(b);
+    solution.setInitialAugmentedMatrix(augmented); // 设置初始增广矩阵
+    
     history.addStep(OperationStep(
         OperationType::RESULT_STATE,
         "构造增广矩阵 [A|b]:",
@@ -397,7 +515,7 @@ std::string EquationSolver::generateSolutionDescription(const EquationSolution& 
     std::stringstream ss;
     const auto& info = solution.getSystemInfo();
     
-    ss << "方程组分析:\n";
+    ss << "方程组分析:\n"; // 此处已包含方程数、变量数、秩等信息
     ss << "- 方程个数: " << info.numEquations << "\n";
     ss << "- 变量个数: " << info.numVariables << "\n";
     ss << "- 系数矩阵的秩: " << info.coefficientRank << "\n";

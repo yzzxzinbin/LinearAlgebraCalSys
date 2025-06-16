@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <iostream>
+#include <string> 
 #include "fraction.h"
 
 // 前向声明
@@ -69,4 +70,8 @@ public:
     void deleteRow(size_t rowIndex);
     void deleteColumn(size_t colIndex);
     void resize(size_t newRows, size_t newCols); // 调整大小，用0填充新元素
+
+    // 新增：序列化和反序列化方法
+    std::string serialize() const;
+    static Matrix deserialize(const std::string& s);
 };

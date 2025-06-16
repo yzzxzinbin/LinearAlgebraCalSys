@@ -37,6 +37,7 @@ private:
     Matrix homogeneousSolutions;  // 齐次解的基础解系
     EquationSystemInfo systemInfo;
     std::string detailedDescription;
+    Matrix initialAugmentedMatrix; // 新增：存储初始增广矩阵
 
 public:
     EquationSolution();
@@ -47,6 +48,7 @@ public:
     void setParticularSolution(const Matrix& solution);
     void setHomogeneousSolutions(const Matrix& solutions);
     void setDetailedDescription(const std::string& desc);
+    void setInitialAugmentedMatrix(const Matrix& augMatrix); // 新增 setter
     
     // 获取解的信息
     SolutionType getSolutionType() const;
@@ -54,6 +56,7 @@ public:
     const Matrix& getParticularSolution() const;
     const Matrix& getHomogeneousSolutions() const;
     std::string getDetailedDescription() const;
+    const Matrix& getInitialAugmentedMatrix() const; // 新增 getter
     
     // 检查是否有解
     bool hasSolution() const;
@@ -62,6 +65,10 @@ public:
     
     // 输出解的信息
     void print(std::ostream& os = std::cout) const;
+
+    // 新增：序列化和反序列化方法
+    std::string serialize() const;
+    static EquationSolution deserialize(const std::string& s);
 };
 
 // 方程组求解器

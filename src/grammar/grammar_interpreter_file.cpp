@@ -28,23 +28,29 @@ Fraction Interpreter::parseFractionString(const std::string &s) const
     if (slash_pos == std::string::npos)
     {
         // 直接使用 BigInt 构造函数解析整数字符串
-        try {
+        try
+        {
             BigInt num(s);
             return Fraction(num);
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception &e)
+        {
             throw std::invalid_argument("无法解析整数字符串: " + s + " (" + e.what() + ")");
         }
     }
     else
     {
         // 直接使用 BigInt 构造函数解析分子和分母字符串
-        try {
+        try
+        {
             std::string numStr = s.substr(0, slash_pos);
             std::string denStr = s.substr(slash_pos + 1);
             BigInt num(numStr);
             BigInt den(denStr);
             return Fraction(num, den);
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception &e)
+        {
             throw std::invalid_argument("无法解析分数字符串: " + s + " (" + e.what() + ")");
         }
     }
@@ -84,8 +90,11 @@ std::string Interpreter::serializeVariable(const std::string &name, const Variab
             }
         }
         break;
-    case VariableType::RESULT:  // 新增：序列化Result类型
+    case VariableType::RESULT: // 新增：序列化Result类型
         oss << "RESULT:" << var.resultValue.serialize();
+        break;
+    case VariableType::EQUATION_SOLUTION: // 新增：序列化方程组解类型
+        oss << "EQUATION_SOLUTION:" << var.equationSolutionValue.serialize();
         break;
     }
     return oss.str();
@@ -182,7 +191,7 @@ std::pair<std::string, Variable> Interpreter::deserializeLine(const std::string 
     }
     std::string typeStr = rest_after_name.substr(0, second_colon_pos);
     std::string dataStr = rest_after_name.substr(second_colon_pos + 1);
-    
+
     Variable var;
 
     if (typeStr == "FRACTION")
@@ -211,7 +220,7 @@ std::pair<std::string, Variable> Interpreter::deserializeLine(const std::string 
     {
         size_t first_comma = dataStr.find(',');
         // The colon separating dimensions from elements is the first colon in dataStr for matrices.
-        size_t dims_elements_separator_colon = dataStr.find(':'); 
+        size_t dims_elements_separator_colon = dataStr.find(':');
 
         if (first_comma == std::string::npos || dims_elements_separator_colon == std::string::npos || first_comma > dims_elements_separator_colon)
         {
@@ -242,9 +251,13 @@ std::pair<std::string, Variable> Interpreter::deserializeLine(const std::string 
         }
         var = Variable(mat);
     }
-    else if (typeStr == "RESULT")  // 新增：反序列化Result类型
+    else if (typeStr == "RESULT") // 新增：反序列化Result类型
     {
         var = Variable(Result::deserialize(dataStr));
+    }
+    else if (typeStr == "EQUATION_SOLUTION") // 新增：反序列化EquationSolution类型
+    {
+        var = Variable(EquationSolution::deserialize(dataStr));
     }
     else
     {
@@ -253,7 +266,7 @@ std::pair<std::string, Variable> Interpreter::deserializeLine(const std::string 
     return {name, var};
 }
 
-std::string Interpreter::exportVariables(const std::string &filename, const std::deque<std::string>& commandHistory)
+std::string Interpreter::exportVariables(const std::string &filename, const std::deque<std::string> &commandHistory)
 {
     std::ofstream outFile(filename);
     if (!outFile.is_open())
@@ -272,17 +285,18 @@ std::string Interpreter::exportVariables(const std::string &filename, const std:
         catch (const std::exception &e)
         {
             LOG_ERROR("序列化变量 " + pair.first + " 时出错: " + e.what());
-            outFile.close(); 
+            outFile.close();
             return "错误: 序列化变量 " + pair.first + " 时出错: " + e.what();
         }
     }
 
     // 序列化命令历史 (从最新到最旧)
     LOG_INFO("开始导出命令历史到 " + filename);
-    for (const auto& command : commandHistory) { // deque 迭代器从头到尾 (即最新到最旧)
+    for (const auto &command : commandHistory)
+    { // deque 迭代器从头到尾 (即最新到最旧)
         outFile << HISTORY_MARKER << command << std::endl;
     }
-    
+
     outFile.close();
     LOG_INFO("变量和命令历史已成功导出到 " + filename);
     return "变量和命令历史已成功导出到 " + filename;
@@ -303,12 +317,15 @@ std::pair<std::string, std::vector<std::string>> Interpreter::importVariables(co
     {
         lineNum++;
         if (line.empty() || line[0] == '#') // 跳过空行和注释
-            continue; 
+            continue;
 
         // 检查行是否以 HISTORY_MARKER 开头
-        if (line.rfind(HISTORY_MARKER, 0) == 0) { 
+        if (line.rfind(HISTORY_MARKER, 0) == 0)
+        {
             importedHistoryCommands.push_back(line.substr(HISTORY_MARKER.length()));
-        } else {
+        }
+        else
+        {
             try
             {
                 auto pair = deserializeLine(line);

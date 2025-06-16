@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <sstream>
 #include <stdexcept>
+#include <vector>
 #include <boost/lexical_cast.hpp> // 新增：用于 BigInt 到字符串的转换
 
 Matrix::Matrix(size_t r, size_t c) : rows(r), cols(c), data(r, std::vector<Fraction>(c)) {}
@@ -662,4 +663,116 @@ void Matrix::resize(size_t newRows, size_t newCols) {
         if (rows == 0) cols = 0;
         if (cols == 0) rows = 0;
     }
+}
+
+// 新增：序列化方法
+std::string Matrix::serialize() const {
+    std::ostringstream oss;
+    oss << rows << "," << cols << ":";
+    for (size_t r = 0; r < rows; ++r) {
+        for (size_t c = 0; c < cols; ++c) {
+            oss << data[r][c].toString(); // 使用 Fraction::toString() 以确保一致性
+            if (r < rows - 1 || c < cols - 1) {
+                oss << ",";
+            }
+        }
+    }
+    return oss.str();
+}
+
+// 新增：辅助函数，用于从字符串解析 Fraction (简化版 Interpreter::parseFractionString)
+static Fraction parseFractionFromString(const std::string& s) {
+    if (s.empty()) {
+        throw std::invalid_argument("Cannot parse empty string to Fraction");
+    }
+    size_t slash_pos = s.find('/');
+    if (slash_pos == std::string::npos) {
+        try {
+            return Fraction(BigInt(s));
+        } catch (const std::exception& e) {
+            throw std::invalid_argument("Invalid integer string for Fraction: " + s + " (" + e.what() + ")");
+        }
+    } else {
+        try {
+            std::string numStr = s.substr(0, slash_pos);
+            std::string denStr = s.substr(slash_pos + 1);
+            if (numStr.empty() || denStr.empty()) {
+                 throw std::invalid_argument("Invalid fraction format (empty num/den): " + s);
+            }
+            return Fraction(BigInt(numStr), BigInt(denStr));
+        } catch (const std::exception& e) {
+            throw std::invalid_argument("Invalid fraction string: " + s + " (" + e.what() + ")");
+        }
+    }
+}
+
+// 新增：反序列化方法
+Matrix Matrix::deserialize(const std::string& s) {
+    size_t colonPos = s.find(':');
+    if (colonPos == std::string::npos) {
+        throw std::invalid_argument("Invalid matrix serialization format: missing colon");
+    }
+
+    std::string dimsStr = s.substr(0, colonPos);
+    std::string dataStr = s.substr(colonPos + 1);
+
+    size_t commaPos = dimsStr.find(',');
+    if (commaPos == std::string::npos) {
+        throw std::invalid_argument("Invalid matrix serialization format: missing comma in dimensions");
+    }
+
+    size_t rows, cols;
+    try {
+        rows = std::stoul(dimsStr.substr(0, commaPos));
+        cols = std::stoul(dimsStr.substr(commaPos + 1));
+    } catch (const std::exception& e) {
+        throw std::invalid_argument("Invalid matrix dimensions in serialization: " + dimsStr);
+    }
+    
+
+    Matrix mat(rows, cols);
+    if (rows == 0 || cols == 0) { // 空矩阵
+        if (!dataStr.empty()) {
+            // 如果维度为0但数据字符串不为空，这可能是一个格式问题，但我们允许它
+            // 因为一个0xN或Nx0矩阵的数据部分应该为空。
+        }
+        return mat; // 返回一个正确维度的空矩阵
+    }
+
+    std::vector<std::string> elements;
+    std::stringstream ss(dataStr);
+    std::string item;
+    while (std::getline(ss, item, ',')) {
+        elements.push_back(item);
+    }
+
+    if (elements.size() != rows * cols) {
+        // 如果元素为空但 rows*cols > 0，则这是一个错误
+        if (elements.empty() && (rows * cols > 0)) {
+             throw std::invalid_argument("Matrix element count mismatch. Expected " + std::to_string(rows * cols) + ", got 0. Data: " + dataStr);
+        }
+        // 如果元素数量不匹配，但只有一个元素且为空字符串，这可能是由序列化 "0,0:" 这样的空矩阵产生的
+        // 这种情况应该由上面的 (rows == 0 || cols == 0) 处理。
+        // 如果执行到这里，意味着 rows*cols > 0。
+        if (!(elements.size() == 1 && elements[0].empty() && rows * cols == 0)) { // 后一个条件总是false，因为我们已经检查了rows*cols > 0
+             throw std::invalid_argument("Matrix element count mismatch. Expected " + std::to_string(rows * cols) + ", got " + std::to_string(elements.size()));
+        }
+    }
+
+
+    for (size_t r = 0; r < rows; ++r) {
+        for (size_t c = 0; c < cols; ++c) {
+            size_t index = r * cols + c;
+            if (index < elements.size()) {
+                 try {
+                    mat.at(r, c) = parseFractionFromString(elements[index]);
+                } catch (const std::exception& e) {
+                    throw std::runtime_error("Error parsing fraction element '" + elements[index] + "' for matrix: " + e.what());
+                }
+            } else if (rows * cols > 0) { // Should not happen if element count check is correct
+                throw std::runtime_error("Matrix deserialization error: not enough elements provided.");
+            }
+        }
+    }
+    return mat;
 }
