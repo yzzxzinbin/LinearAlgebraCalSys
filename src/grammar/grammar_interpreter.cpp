@@ -66,7 +66,7 @@ void Interpreter::executeCommand(const std::string& command, const std::vector<s
         std::cout << "  v3 = v1 + v2       - 向量加法\n";
         std::cout << "  f3 = f1 * f2       - 分数乘法\n";
         std::cout << "\n";
-        std::cout << "矩阵函数:\n";
+        std::cout << "矩阵和向量函数:\n"; // 更新标题
         std::cout << "  m2 = transpose(m1)        - 矩阵转置\n";
         std::cout << "  m2 = inverse(m1)          - 计算逆矩阵(伴随矩阵法)\n";
         std::cout << "  m2 = inverse_gauss(m1)    - 计算逆矩阵(高斯-若尔当法)\n";
@@ -77,7 +77,12 @@ void Interpreter::executeCommand(const std::string& command, const std::vector<s
         std::cout << "  m2 = rref(m1)             - 最简行阶梯形\n";
         std::cout << "  m2 = cofactor_matrix(m1)  - 计算代数余子式矩阵\n";
         std::cout << "  m2 = adjugate(m1)         - 计算伴随矩阵\n";
-        std::cout << "  sol = solveq(A, b)        - 求解线性方程组 Ax=b\n";
+        std::cout << "  m  = diag(v1)             - 从向量v1创建对角矩阵\n";
+        std::cout << "  m  = diag(m_col)          - 从单列矩阵m_col创建对角矩阵\n";
+        std::cout << "  m  = diag(f1, f2, ...)    - 用分数f1, f2等创建对角矩阵\n";
+        std::cout << "  f  = dot(v1, v2)          - 计算向量v1和v2的点积\n";
+        std::cout << "  v3 = cross(v1, v2)        - 计算三维向量v1和v2的叉积 (使用 'x' 运算符或函数)\n";
+        std::cout << "  sol = solveq(A, b)        - 求解线性方程组 Ax=b (b可以是列矩阵或向量)\n";
         std::cout << "  sol = solveq(A)           - 求解齐次方程组 Ax=0\n";
     } else if (commandLower == "clear") {
         // 清屏命令在应用程序中处理
@@ -353,30 +358,46 @@ Variable Interpreter::executeFunctionCall(const FunctionCallNode* node) {
         return Variable(args[0].vectorValue.normalize());
     } else if (funcNameLower == "diag") {
         if (args.empty()) {
-            throw std::runtime_error("diag函数需要至少一个参数 (对角线元素或向量)");
+            throw std::runtime_error("diag函数需要至少一个参数 (对角线元素、向量或单列矩阵)");
         }
         std::vector<Fraction> diagElements;
-        if (args.size() == 1 && args[0].type == VariableType::VECTOR) {
-            // diag(vector)
-            const Vector& v = args[0].vectorValue;
-            for (size_t i = 0; i < v.size(); ++i) {
-                diagElements.push_back(v.at(i));
+
+        if (args.size() == 1) { // 单参数模式
+            const auto& arg = args[0];
+            if (arg.type == VariableType::VECTOR) {
+                const Vector& v = arg.vectorValue;
+                for (size_t i = 0; i < v.size(); ++i) {
+                    diagElements.push_back(v.at(i));
+                }
+            } else if (arg.type == VariableType::MATRIX) {
+                const Matrix& m = arg.matrixValue;
+                if (m.colCount() == 1) { // 检查是否为列向量（单列矩阵）
+                    for (size_t i = 0; i < m.rowCount(); ++i) {
+                        diagElements.push_back(m.at(i, 0));
+                    }
+                } else {
+                    throw std::runtime_error("diag函数如果参数是矩阵，则该矩阵必须为列向量 (只有一列)");
+                }
+            } else if (arg.type == VariableType::FRACTION) {
+                diagElements.push_back(arg.fractionValue); // 例如 diag(f1)
+            } else {
+                std::ostringstream error_msg;
+                error_msg << "diag函数的单个参数必须是向量、单列矩阵或分数。实际收到的参数类型 ID: "
+                          << static_cast<int>(arg.type);
+                throw std::runtime_error(error_msg.str());
             }
-        } else {
-            // diag(f1, f2, ...)
+        } else { // 多参数模式: diag(f1, f2, ...)
             for (const auto& arg : args) {
                 if (arg.type != VariableType::FRACTION) {
-                    // 改进错误消息，提供更多上下文
                     std::ostringstream error_msg;
-                    error_msg << "diag函数的参数必须是分数或单个向量。实际收到的参数类型 ID: " 
+                    error_msg << "diag函数的多参数形式其参数必须都是分数。实际收到的参数类型 ID: "
                               << static_cast<int>(arg.type);
-                    // 此处可以根据 VariableType 枚举值转换为字符串表示，以提高可读性，
-                    // 但为保持简洁，暂时只输出整数 ID。
                     throw std::runtime_error(error_msg.str());
                 }
                 diagElements.push_back(arg.fractionValue);
             }
         }
+
         if (diagElements.empty()) { 
             throw std::runtime_error("diag函数需要有效的对角线元素");
         }
@@ -389,15 +410,25 @@ Variable Interpreter::executeFunctionCall(const FunctionCallNode* node) {
             } else {
                 return Variable(EquationSolver::solveHomogeneous(args[0].matrixValue));
             }
-        } else if (args.size() == 2 && args[0].type == VariableType::MATRIX && args[1].type == VariableType::MATRIX) {
+        } else if (args.size() == 2 && args[0].type == VariableType::MATRIX) {
             // 非齐次方程组 Ax = b
-            if (showSteps) {
-                return Variable(EquationSolver::solve(args[0].matrixValue, args[1].matrixValue, currentOpHistory_));
+            if (args[1].type == VariableType::MATRIX) {
+                if (showSteps) {
+                    return Variable(EquationSolver::solve(args[0].matrixValue, args[1].matrixValue, currentOpHistory_));
+                } else {
+                    return Variable(EquationSolver::solve(args[0].matrixValue, args[1].matrixValue));
+                }
+            } else if (args[1].type == VariableType::VECTOR) {
+                if (showSteps) {
+                    return Variable(EquationSolver::solve(args[0].matrixValue, args[1].vectorValue, currentOpHistory_));
+                } else {
+                    return Variable(EquationSolver::solve(args[0].matrixValue, args[1].vectorValue));
+                }
             } else {
-                return Variable(EquationSolver::solve(args[0].matrixValue, args[1].matrixValue));
+                throw std::runtime_error("solveq函数第二个参数(常数项b)必须是矩阵或向量");
             }
         } else {
-            throw std::runtime_error("solveq函数需要一个矩阵参数(齐次)或两个矩阵参数(非齐次)");
+            throw std::runtime_error("solveq函数需要一个矩阵参数(齐次Ax=0)或一个矩阵和一个矩阵/向量参数(非齐次Ax=b)");
         }
     } else {
         throw std::runtime_error("未知函数: " + funcNameOriginal);

@@ -111,6 +111,27 @@ void EquationSolution::print(std::ostream& os) const {
 }
 
 // EquationSolver 实现
+
+// 新增：实现 solve(Matrix, Vector)
+EquationSolution EquationSolver::solve(const Matrix& A, const Vector& b) {
+    OperationHistory dummy;
+    return solve(A, b, dummy);
+}
+
+// 新增：实现 solve(Matrix, Vector, OperationHistory)
+EquationSolution EquationSolver::solve(const Matrix& A, const Vector& b, OperationHistory& history) {
+    // 将 Vector b 转换为 Matrix (列向量)
+    if (A.rowCount() != b.size() && b.size() != 0) { // b.size() == 0 可能是空向量，后续会处理
+        throw std::invalid_argument("系数矩阵的行数必须与向量 b 的元素个数匹配");
+    }
+    Matrix b_matrix(b.size(), 1);
+    for (size_t i = 0; i < b.size(); ++i) {
+        b_matrix.at(i, 0) = b.at(i);
+    }
+    // 调用原有的 solve 方法
+    return solve(A, b_matrix, history);
+}
+
 EquationSolution EquationSolver::solve(const Matrix& A, const Matrix& b) {
     OperationHistory dummy;
     return solve(A, b, dummy);

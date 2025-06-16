@@ -70,6 +70,9 @@ public:
     // 求解线性方程组 Ax = b (非齐次)
     static EquationSolution solve(const Matrix& A, const Matrix& b);
     static EquationSolution solve(const Matrix& A, const Matrix& b, OperationHistory& history);
+    // 新增：重载以接受 Vector b
+    static EquationSolution solve(const Matrix& A, const Vector& b);
+    static EquationSolution solve(const Matrix& A, const Vector& b, OperationHistory& history);
     
     // 求解齐次线性方程组 Ax = 0
     static EquationSolution solveHomogeneous(const Matrix& A);
