@@ -5,6 +5,15 @@
 
 namespace TuiUtils {
 
+// New struct to pass detailed item information to drawTextList
+struct PrintableListItem {
+    std::string indentString;
+    std::string iconGlyph;
+    RGBColor iconColor; // Changed from Color to RGBColor
+    std::string textWithoutIcon;
+    std::string fullDisplayStringForMatching; // Used for specialItemText matching against the original full display string
+};
+
 // 从文件读取所有行
 std::vector<std::string> readFileLines(const std::string& filePath);
 
@@ -12,14 +21,16 @@ std::vector<std::string> readFileLines(const std::string& filePath);
 void drawBox(int r, int c, int h, int w, const std::string& title = "", Color borderColor = Color::WHITE, Color bgColor = Color::DEFAULT);
 
 // 在指定区域内绘制一个字符串列表，支持高亮选中项和滚动
-void drawTextList(int r, int c, int h, int w, const std::vector<std::string>& items,
+void drawTextList(int r, int c, int h, int w, 
+                  const std::vector<PrintableListItem>& itemsToPrint, // Changed to use PrintableListItem
                   int selectedIndex, int scrollOffset,
-                  Color itemColor = Color::DEFAULT, Color selectedColor = Color::YELLOW, 
-                  Color selectedBgColor = Color::BLUE, Color defaultBgColor = Color::BLACK,
-                  // 新增参数用于特殊项样式
-                  const std::string& specialItemText = "", 
-                  Color specialItemFgColor = Color::DEFAULT,
-                  Color specialItemBgColor = Color::DEFAULT);
+                  Color defaultItemTextColor = Color::DEFAULT,     // Renamed from itemColor
+                  Color selectedItemTextColor = Color::YELLOW,   // Renamed from selectedColor
+                  Color selectedItemBgColor = Color::BLUE, 
+                  Color defaultItemBgColor = Color::BLACK,       // Renamed from defaultBgColor
+                  const std::string& specialItemFullTextMatch = "", // To match against PrintableListItem.fullDisplayStringForMatching
+                  Color specialItemTextColor = Color::DEFAULT,   // Renamed from specialItemFgColor, applies to text
+                  Color specialItemBgColor = Color::DEFAULT);    // Renamed from specialItemBgColor
 
 void drawTextLines(int r, int c, int h, int w, const std::vector<std::string>& lines, 
                    Color textColor = Color::DEFAULT, Color bgColor = Color::BLACK);

@@ -93,57 +93,107 @@ void drawBox(int r, int c, int h, int w, const std::string& title, Color borderC
     Terminal::resetColor();
 }
 
-void drawTextList(int r, int c, int h, int w, const std::vector<std::string>& items,
+void drawTextList(int r, int c, int h, int w, 
+                  const std::vector<PrintableListItem>& itemsToPrint,
                   int selectedIndex, int scrollOffset,
-                  Color itemColor, Color selectedColor,
-                  Color selectedBgColor, Color defaultBgColor,
-                  const std::string& specialItemText, 
-                  Color specialItemFgColor, Color specialItemBgColor) {
+                  Color defaultItemTextColor, Color selectedItemTextColor, 
+                  Color selectedItemBgColor, Color defaultItemBgColor,
+                  const std::string& specialItemFullTextMatch, 
+                  Color specialItemTextColor, Color specialItemBgColor) {
     if (h <= 0 || w <= 0) return;
 
     for (int i = 0; i < h; ++i) {
         Terminal::setCursor(r + i, c);
         int itemIdx = scrollOffset + i;
-        if (itemIdx >= 0 && itemIdx < static_cast<int>(items.size())) {
-            const std::string& originalItemText = items[itemIdx]; 
-            std::string itemTextToDisplay = originalItemText;    
 
-            // 使用视觉宽度进行处理
-            size_t visualLen = TuiUtils::countUtf8CodePoints(itemTextToDisplay);
+        if (itemIdx >= 0 && itemIdx < static_cast<int>(itemsToPrint.size())) {
+            const auto& pItem = itemsToPrint[itemIdx];
+            
+            Color currentItemFgColor = defaultItemTextColor;
+            Color currentItemBgColor = defaultItemBgColor;
+            bool isSpecialMatched = false;
 
-            if (visualLen > static_cast<size_t>(w)) {
-                itemTextToDisplay = TuiUtils::trimToVisualWidth(itemTextToDisplay, w);
-                // trimToVisualWidth 应该返回一个视觉宽度为 w 的字符串（或尽可能接近）
-                // 为确保准确，可以重新计算修剪后的视觉长度，但通常假设trim函数是准确的
-                visualLen = TuiUtils::countUtf8CodePoints(itemTextToDisplay); 
+            if (!specialItemFullTextMatch.empty() && pItem.fullDisplayStringForMatching == specialItemFullTextMatch) {
+                isSpecialMatched = true;
+                currentItemFgColor = specialItemTextColor; // Text color for special item
+                currentItemBgColor = specialItemBgColor;   // Background for special item
             }
-
-            // 基于视觉宽度进行填充
-            std::string padding;
-            if (visualLen < static_cast<size_t>(w)) {
-                padding.assign(w - visualLen, ' ');
-            }
-            itemTextToDisplay += padding;
-
-
-            bool isSpecialItem = (!specialItemText.empty() && originalItemText == specialItemText);
 
             if (itemIdx == selectedIndex) {
-                Terminal::setForeground(selectedColor);
-                Terminal::setBackground(selectedBgColor);
-            } else if (isSpecialItem) {
-                Color fg = (specialItemFgColor == Color::DEFAULT) ? itemColor : specialItemFgColor;
-                Color bg = (specialItemBgColor == Color::DEFAULT) ? defaultBgColor : specialItemBgColor;
-                Terminal::setForeground(fg);
-                Terminal::setBackground(bg);
-            } else {
-                Terminal::setForeground(itemColor);
-                Terminal::setBackground(defaultBgColor);
+                currentItemFgColor = selectedItemTextColor; // Override with selected text color
+                currentItemBgColor = selectedItemBgColor;   // Override with selected background
             }
-            std::cout << itemTextToDisplay;
+            
+            Terminal::setBackground(currentItemBgColor); // Set background for the entire line
+
+            size_t currentVisualCol = 0;
+            auto printSegment = [&](const std::string& text, Color fgColor, size_t& visualCol, int maxWidth) {
+                if (visualCol >= static_cast<size_t>(maxWidth)) return;
+
+                std::string segmentToPrint = text;
+                size_t segmentVisualLen = TuiUtils::countUtf8CodePoints(segmentToPrint);
+                
+                if (visualCol + segmentVisualLen > static_cast<size_t>(maxWidth)) {
+                    segmentToPrint = TuiUtils::trimToVisualWidth(segmentToPrint, maxWidth - visualCol);
+                    segmentVisualLen = TuiUtils::countUtf8CodePoints(segmentToPrint); // Re-evaluate after trim
+                }
+
+                Terminal::setForeground(fgColor);
+                std::cout << segmentToPrint;
+                visualCol += segmentVisualLen;
+            };
+            
+            // Print Indent
+            printSegment(pItem.indentString, currentItemFgColor, currentVisualCol, w);
+
+            // Print Icon (if any)
+            if (!pItem.iconGlyph.empty()) {
+                printSegment(" ", currentItemFgColor, currentVisualCol, w); // Space before icon
+                
+                // Use RGBColor for the icon
+                // The icon's RGB color is independent of selection/special status for now.
+                // If icon color should also change when selected/special, add logic here.
+                Terminal::setForegroundRGB(pItem.iconColor.r, pItem.iconColor.g, pItem.iconColor.b);
+                
+                // Temporarily print the icon glyph directly as printSegment expects a Color enum for fg
+                // and we need to use setForegroundRGB.
+                // We need to ensure the visual width calculation and trimming is still respected.
+                std::string iconToPrint = pItem.iconGlyph;
+                size_t iconVisualLen = TuiUtils::countUtf8CodePoints(iconToPrint);
+                bool iconPrinted = false;
+
+                if (currentVisualCol < static_cast<size_t>(w)) {
+                    if (currentVisualCol + iconVisualLen > static_cast<size_t>(w)) {
+                        iconToPrint = TuiUtils::trimToVisualWidth(iconToPrint, w - currentVisualCol);
+                        iconVisualLen = TuiUtils::countUtf8CodePoints(iconToPrint); // Re-evaluate after trim
+                    }
+                    if (iconVisualLen > 0) {
+                        std::cout << iconToPrint;
+                        currentVisualCol += iconVisualLen;
+                        iconPrinted = true;
+                    }
+                }
+                
+                // After printing icon with RGB, reset foreground for subsequent space/text
+                Terminal::setForeground(currentItemFgColor); 
+                
+                if (iconPrinted) { // Only print space after icon if icon was printed
+                    printSegment(" ", currentItemFgColor, currentVisualCol, w); // Space after icon
+                }
+            }
+            
+            // Print Text
+            printSegment(pItem.textWithoutIcon, currentItemFgColor, currentVisualCol, w);
+
+            // Fill remaining space on the line
+            if (currentVisualCol < static_cast<size_t>(w)) {
+                Terminal::setForeground(currentItemFgColor); // Not strictly necessary for spaces
+                std::cout << std::string(w - currentVisualCol, ' ');
+            }
+
         } else {
-            // 清除没有项目的行
-            Terminal::setBackground(defaultBgColor); // 使用默认背景色清除
+            // Clear empty lines below the list items
+            Terminal::setBackground(defaultItemBgColor);
             std::cout << std::string(w, ' ');
         }
     }

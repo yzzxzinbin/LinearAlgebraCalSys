@@ -25,6 +25,21 @@ const int KEY_CTRL_RIGHT = 0x1004;
 const int KEY_CTRL_A     = 0x1005; // 新增：CTRL+A全选
 // KEY_DELETE is already defined, ensure Terminal::readChar() can return it.
 
+// 新增：RGB颜色结构体
+struct RGBColor {
+    uint8_t r, g, b;
+
+    // 默认构造函数 (例如，黑色或白色)
+    RGBColor(uint8_t r_val = 0, uint8_t g_val = 0, uint8_t b_val = 0) : r(r_val), g(g_val), b(b_val) {}
+
+    // 比较操作符 (可选, 但可能有用)
+    bool operator==(const RGBColor& other) const {
+        return r == other.r && g == other.g && b == other.b;
+    }
+    bool operator!=(const RGBColor& other) const {
+        return !(*this == other);
+    }
+};
 
 // 终端颜色
 enum class Color {

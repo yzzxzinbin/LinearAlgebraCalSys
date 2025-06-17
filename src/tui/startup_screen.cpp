@@ -12,6 +12,44 @@ namespace fs = std::filesystem;
 // 定义 NULL 选项的文本
 const std::string StartupScreen::NULL_WORKSPACE_OPTION_TEXT = " -------- NONE -------- ";
 
+// 新增：获取文件图标颜色的辅助方法实现
+RGBColor StartupScreen::getIconColorForFile(const std::string &filename) { // Return type changed
+    std::string ext_str;
+    try {
+        fs::path p = filename;
+        ext_str = p.extension().string();
+    } catch (const std::exception &e) {
+        LOG_WARNING("Could not parse filename for extension (color): " + filename + " Error: " + e.what());
+    }
+
+    std::transform(ext_str.begin(), ext_str.end(), ext_str.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+
+    // Text file extensions
+    static const std::unordered_set<std::string> textExtensions = {
+        ".txt", ".md", ".cpp", ".h", ".hpp", ".c", ".py", ".js", ".json", ".html", ".css", ".xml", ".csv", ".log"
+    };
+    // Resource file extensions
+    static const std::unordered_set<std::string> resourceExtensions = {
+        ".jpg", ".jpeg", ".png", ".gif", ".svg", ".pdf", ".zip", ".tar", ".rar"
+    };
+    // Executable file extensions
+    static const std::unordered_set<std::string> executableExtensions = {
+        ".exe", ".dll", ".sh", ".ps1"
+    };
+    // Office file extensions (specific colors)
+    if (ext_str == ".doc" || ext_str == ".docx") return {0, 82, 155}; // Darker Blue
+    if (ext_str == ".xls" || ext_str == ".xlsx") return {16, 124, 64}; // Darker Green
+    if (ext_str == ".ppt" || ext_str == ".pptx") return {211, 72, 47}; // Office Red/Orange
+
+    if (textExtensions.count(ext_str)) return {170, 170, 170}; // Light Gray
+    if (resourceExtensions.count(ext_str)) return {100, 100, 255}; // A shade of blue
+    if (executableExtensions.count(ext_str)) return {220, 220, 220}; // Light gray/white for executables
+    
+    return {255, 255, 255}; // Default color for other file icons (White)
+}
+
+
 // 新增：获取文件图标的辅助方法实现
 std::string StartupScreen::getIconForFile(const std::string &filename)
 {
@@ -69,9 +107,12 @@ std::string StartupScreen::getIconForFile(const std::string &filename)
         {".ps1", ""}, // PowerShell 脚本
 
         // 办公文件
-        {"word", "󱎒"},       // Word 文档
-        {"excel", "󱎏"},      // Excel 表格
-        {"powerpoint", "󱎐"}, // PowerPoint 演示文稿
+        {".doc", "󱎒"},       // Word 文档
+        {".docx", "󱎒"},      // Word 文档（.docx）
+        {".xls", "󱎏"},      // Excel 表格
+        {".xlsx", "󱎏"},     // Excel 表格（.xlsx）
+        {".ppt", "󱎐"}, // PowerPoint 演示文稿
+        {".pptx", "󱎐"}, // PowerPoint 演示文稿（.pptx）
         // 添加更多文件类型和对应的图标
     };
 
@@ -86,35 +127,32 @@ std::string StartupScreen::getIconForFile(const std::string &filename)
 // Helper to build the display string for a ListItem
 void StartupScreen::buildDisplayString(ListItem &item)
 {
-    std::string indentPart;
-    // Add indentation based on depth
+    item.indentString.clear();
     for (int i = 0; i < item.depth; ++i)
     {
-        indentPart += INDENT_STRING;
+        item.indentString += INDENT_STRING;
     }
 
-    std::string iconAndNamePart;
+    std::string namePart = item.name; // Original name for files/dirs, or special text
+
     if (item.itemType == ListItem::Type::DIRECTORY)
     {
-        // 图标左侧加一个空格，图标本身，图标右侧一个空格，然后是名称
-        iconAndNamePart = " " + std::string(item.isExpanded ? ICON_DIR_OPEN : ICON_DIR_CLOSED) + " " + item.name;
+        item.iconGlyph = item.isExpanded ? ICON_DIR_OPEN : ICON_DIR_CLOSED;
+        item.iconColor = {255, 165, 0}; // Orange using RGB
+        item.displayName = item.indentString + " " + item.iconGlyph + " " + namePart;
     }
     else if (item.itemType == ListItem::Type::FILE)
     {
-        // 使用新的辅助函数获取文件类型特定的图标
-        std::string fileIcon = getIconForFile(item.name);
-        // 图标左侧加一个空格，图标本身，图标右侧一个空格，然后是名称
-        iconAndNamePart = " " + fileIcon + " " + item.name;
+        item.iconGlyph = getIconForFile(item.name); // item.name is filename
+        item.iconColor = getIconColorForFile(item.name);
+        item.displayName = item.indentString + " " + item.iconGlyph + " " + namePart;
     }
     else if (item.itemType == ListItem::Type::SPECIAL)
     {
-        // 特殊项（如 "None"）前面不加图标的额外空格，只应用缩进（如果depth > 0）
-        // 如果希望特殊项在 depth 0 时也与其他项的文本部分对齐，可以添加与 " icon " 等宽的空格
-        // 例如: iconAndNamePart = "   " + item.name; // 假设 " icon " 视觉宽度为3
-        // 为简单起见，目前仅使用名称
-        iconAndNamePart = item.name;
+        item.iconGlyph = ""; // No icon for special items like "None"
+        item.iconColor = {255, 255, 255}; // Default to white, or a specific RGB if needed
+        item.displayName = item.indentString + namePart; // Special items might not have leading/trailing spaces around icon
     }
-    item.displayName = indentPart + iconAndNamePart;
 }
 
 // Helper to get children of a given path and populate a list
@@ -160,7 +198,7 @@ void StartupScreen::getChildrenOfPath(const std::string &path, int depth, std::v
         if (fs::is_directory(entry.status()))
         {
             ListItem dirItem(itemName, "", itemFullPath, ListItem::Type::DIRECTORY, depth, false);
-            buildDisplayString(dirItem);
+            buildDisplayString(dirItem); // This will set iconGlyph, iconColor, indentString, displayName
             childrenList.push_back(dirItem);
         }
         else if (fs::is_regular_file(entry.status()))
@@ -171,17 +209,20 @@ void StartupScreen::getChildrenOfPath(const std::string &path, int depth, std::v
                            [](unsigned char c)
                            { return std::tolower(c); });
 
+            // Corrected and expanded allowedExtensions
             const static std::unordered_set<std::string> allowedExtensions = {
                 "", ".txt", ".cpp", ".json", ".h", ".hpp", ".log", ".md", ".csv",
-                ".py", ".js", ".xml", ".c", ".html", ".css", ".jpg", ".jpeg", ".png", ".gif", ".svg",
-                ".pdf", ".zip", ".tar", ".rar", ".exe", ".dll", ".sh", ".ps1", "word", ".excel", ".powerpoint"
-                // 根据需要添加更多常见的文本文件扩展名
+                ".py", ".js", ".xml", ".c", ".html", ".css", 
+                ".jpg", ".jpeg", ".png", ".gif", ".svg", ".pdf", 
+                ".zip", ".tar", ".rar", 
+                ".exe", ".dll", ".sh", ".ps1", 
+                ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"
             };
 
             if (allowedExtensions.count(ext))
             {
                 ListItem fileItem(itemName, "", itemFullPath, ListItem::Type::FILE, depth, false);
-                buildDisplayString(fileItem);
+                buildDisplayString(fileItem); // This will set iconGlyph, iconColor, indentString, displayName
                 childrenList.push_back(fileItem);
             }
         }
@@ -198,7 +239,7 @@ void StartupScreen::toggleDirectoryExpansion(int listIndex)
         return;
 
     item.isExpanded = !item.isExpanded;
-    buildDisplayString(item); // Update icon in displayName
+    buildDisplayString(item); // Update icon in displayName and other fields
 
     if (item.isExpanded)
     {
@@ -316,6 +357,7 @@ void StartupScreen::loadInitialFiles()
 {
     fileList_.clear();
 
+    // For "None" option, name is the text itself.
     ListItem noneItem(NULL_WORKSPACE_OPTION_TEXT, "", "", ListItem::Type::SPECIAL, 0);
     buildDisplayString(noneItem);
     fileList_.push_back(noneItem);
@@ -495,22 +537,34 @@ void StartupScreen::drawWideLayout(int termRows, int termCols)
         }
         scrollOffset_ = std::max(0, scrollOffset_);
 
-        std::vector<std::string> displayNames;
-        displayNames.reserve(fileList_.size());
-        for (const auto &item : fileList_)
-        {
-            displayNames.push_back(item.displayName);
+        std::vector<TuiUtils::PrintableListItem> printableItems;
+        printableItems.reserve(fileList_.size());
+        for (const auto &item : fileList_) {
+            TuiUtils::PrintableListItem pli;
+            pli.indentString = item.indentString;
+            pli.iconGlyph = item.iconGlyph;
+            pli.iconColor = item.iconColor;
+            pli.textWithoutIcon = item.name; // Original name or special text
+            pli.fullDisplayStringForMatching = item.displayName; // For special item matching
+            printableItems.push_back(pli);
         }
+        
+        // Original colors used by StartupScreen:
+        // defaultItemTextColor = Color::WHITE
+        // selectedItemTextColor = Color::DEFAULT (text color for selected item)
+        // selectedItemBgColor = Color::CYAN
+        // defaultItemBgColor = Color::DEFAULT
+        // specialItemTextColor = Color::YELLOW (for "None" option text)
+        // specialItemBgColor = Color::DEFAULT (for "None" option background)
 
-        TuiUtils::drawTextList(listR, listC, listH, listW, displayNames, currentSelection_, scrollOffset_,
-                               Color::WHITE,
-                               Color::DEFAULT,
-                               Color::CYAN,
-                               Color::DEFAULT,
-                               // 使用 "None" 选项的 displayName 进行特殊项匹配
-                               (fileList_.empty() || fileList_[0].itemType != ListItem::Type::SPECIAL) ? "" : fileList_[0].displayName,
-                               Color::YELLOW, // 特殊项的前景色 (例如 "None")
-                               Color::DEFAULT // 特殊项的背景色 (例如 "None")
+        TuiUtils::drawTextList(listR, listC, listH, listW, printableItems, currentSelection_, scrollOffset_,
+                               Color::WHITE,    // defaultItemTextColor
+                               Color::DEFAULT,  // selectedItemTextColor
+                               Color::CYAN,     // selectedItemBgColor
+                               Color::DEFAULT,  // defaultItemBgColor
+                               (fileList_.empty() || fileList_[0].itemType != ListItem::Type::SPECIAL) ? "" : fileList_[0].displayName, // specialItemFullTextMatch
+                               Color::YELLOW,   // specialItemTextColor
+                               Color::DEFAULT   // specialItemBgColor
         );
     }
 
@@ -570,21 +624,27 @@ void StartupScreen::drawTallLayout(int termRows, int termCols)
         }
         scrollOffset_ = std::max(0, scrollOffset_);
 
-        std::vector<std::string> displayNames;
-        displayNames.reserve(fileList_.size());
-        for (const auto &item : fileList_)
-        {
-            displayNames.push_back(item.displayName);
+        std::vector<TuiUtils::PrintableListItem> printableItems;
+        printableItems.reserve(fileList_.size());
+        for (const auto &item : fileList_) {
+            TuiUtils::PrintableListItem pli;
+            pli.indentString = item.indentString;
+            pli.iconGlyph = item.iconGlyph;
+            pli.iconColor = item.iconColor;
+            pli.textWithoutIcon = item.name; // Original name or special text
+            pli.fullDisplayStringForMatching = item.displayName; // For special item matching
+            printableItems.push_back(pli);
         }
-
-        TuiUtils::drawTextList(listR, listC, listH, listW, displayNames, currentSelection_, scrollOffset_,
-                               Color::WHITE,
-                               Color::DEFAULT,
-                               Color::CYAN,
-                               Color::DEFAULT,
-                               (fileList_.empty() || fileList_[0].itemType != ListItem::Type::SPECIAL) ? "" : fileList_[0].displayName,
-                               Color::YELLOW,
-                               Color::DEFAULT);
+        
+        TuiUtils::drawTextList(listR, listC, listH, listW, printableItems, currentSelection_, scrollOffset_,
+                               Color::WHITE,    // defaultItemTextColor
+                               Color::DEFAULT,  // selectedItemTextColor
+                               Color::CYAN,     // selectedItemBgColor
+                               Color::DEFAULT,  // defaultItemBgColor
+                               (fileList_.empty() || fileList_[0].itemType != ListItem::Type::SPECIAL) ? "" : fileList_[0].displayName, // specialItemFullTextMatch
+                               Color::YELLOW,   // specialItemTextColor
+                               Color::DEFAULT   // specialItemBgColor
+        );
     }
 
     int bannerPanelR = dirHeight, bannerPanelC = 0;

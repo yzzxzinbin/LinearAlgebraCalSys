@@ -20,10 +20,17 @@ struct ListItem {
     enum class Type { FILE, DIRECTORY, SPECIAL } itemType;
     bool isExpanded;           // For directories: true if expanded, false otherwise
     int depth;                 // Indentation depth level
+    
+    // New members for detailed drawing
+    std::string indentString;
+    std::string iconGlyph;
+    RGBColor iconColor; // Changed from Color to RGBColor
 
     ListItem(std::string n, std::string dispN, std::string fp, Type t, int d, bool exp = false)
         : name(std::move(n)), displayName(std::move(dispN)), fullPath(std::move(fp)),
-          itemType(t), isExpanded(exp), depth(d) {}
+          itemType(t), isExpanded(exp), depth(d), iconColor({255, 255, 255}) { // Default to white
+        // indentString, iconGlyph, and potentially updated displayName will be set by buildDisplayString
+    }
 };
 
 class StartupScreen {
@@ -45,7 +52,9 @@ private:
     void buildDisplayString(ListItem& item);
     void getChildrenOfPath(const std::string& path, int depth, std::vector<ListItem>& childrenList);
     void toggleDirectoryExpansion(int listIndex);
-    static std::string getIconForFile(const std::string& filename); // 新增：获取文件图标的辅助方法
+    static std::string getIconForFile(const std::string& filename);
+    // New helper method for icon color
+    static RGBColor getIconColorForFile(const std::string& filename); // Changed return type
 
     std::vector<std::string> bannerLines_;
     std::vector<ListItem> fileList_;    // List of items to display
