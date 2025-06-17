@@ -10,7 +10,6 @@
 // #define ICON_FILE         "" // 旧的通用文件图标，将被移除
 #define ICON_DIR_CLOSED   "" // 更新：文件夹图标 (U+1F4C1)
 #define ICON_DIR_OPEN     "" // 更新：打开的文件夹图标 (U+1F4C2)
-#define INDENT_STRING     "  "   // String used for one level of indentation
 
 // Structure to hold information about each item in the list
 struct ListItem {
@@ -22,20 +21,27 @@ struct ListItem {
     int depth;                 // Indentation depth level
     
     // New members for detailed drawing
-    std::string indentString;
+    std::string constructedIndentString; // Full prefix for display, e.g., "│  ├── "
     std::string iconGlyph;
     RGBColor iconColor; // Changed from Color to RGBColor
+    RGBColor indentColor; // 新增：用于缩进/树结构字符的颜色
+    bool isLastAmongSiblings; // True if this item is the last in its current sibling group
+    std::string stemForMyChildren; // Stem prefix for children of this item, e.g., "│     "
 
-    ListItem(std::string n, std::string dispN, std::string fp, Type t, int d, bool exp = false)
-        : name(std::move(n)), displayName(std::move(dispN)), fullPath(std::move(fp)),
-          itemType(t), isExpanded(exp), depth(d), iconColor({255, 255, 255}) { // Default to white
-        // indentString, iconGlyph, and potentially updated displayName will be set by buildDisplayString
+    ListItem(std::string n, std::string dispN_unused, std::string fp, Type t, int d, bool exp = false)
+        : name(std::move(n)), fullPath(std::move(fp)),
+          itemType(t), isExpanded(exp), depth(d), iconColor({255, 255, 255}), 
+          indentColor({180, 180, 180}), // 初始化 indentColor，例如使用 TREE_STRUCTURE_COLOR
+          isLastAmongSiblings(false) { // Default to white, isLastAmongSiblings defaults to false
+        // constructedIndentString, stemForMyChildren, iconGlyph, iconColor, and displayName
+        // will be set by StartupScreen::buildDisplayString.
     }
 };
 
 class StartupScreen {
 public:
     StartupScreen(const std::string& bannerFilePath, const std::string& workDirPath);
+    ~StartupScreen();
     // 返回选中的文件完整路径，如果按ESC或选中 "None" 则返回空字符串
     std::string run(); 
 
@@ -49,8 +55,8 @@ private:
     int handleInput(int key); 
 
     // Helper methods for list management
-    void buildDisplayString(ListItem& item);
-    void getChildrenOfPath(const std::string& path, int depth, std::vector<ListItem>& childrenList);
+    void buildDisplayString(ListItem& item, const std::string& stemAtItemLevel); // Added stemAtItemLevel parameter
+    void getChildrenOfPath(const std::string& path, int childrenDepth, const std::string& stemForChildrenToUse, std::vector<ListItem>& childrenList); // Parameters changed
     void toggleDirectoryExpansion(int listIndex);
     static std::string getIconForFile(const std::string& filename);
     // New helper method for icon color

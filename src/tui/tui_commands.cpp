@@ -252,8 +252,38 @@ void TuiApp::executeCommand(const std::string &input)
         }
 
         // 处理export命令
-        if (commandStr == "export" && commandArgs.size() == 1) {
-            std::string filename = commandArgs[0];
+        if (commandStr == "export") {
+            // Extract the argument part directly from processedInput
+            std::string argument_part;
+            size_t cmd_len = commandStr.length();
+            if (processedInput.length() > cmd_len) {
+                argument_part = processedInput.substr(cmd_len);
+                // Trim leading whitespace from the argument part
+                size_t first_char_idx = argument_part.find_first_not_of(" \t");
+                if (first_char_idx != std::string::npos) {
+                    argument_part = argument_part.substr(first_char_idx);
+                } else {
+                    // Only whitespace after command, treat as no argument
+                    argument_part.clear();
+                }
+            }
+
+            // Remove trailing semicolon if present on the argument itself
+            if (!argument_part.empty() && argument_part.back() == ';') {
+                argument_part.pop_back();
+            }
+            
+            if (argument_part.empty()) {
+                 throw std::runtime_error("export 命令需要一个文件名参数。用法: export <\"文件名\"> 或 export <文件名>");
+            }
+
+            std::string filename = argument_part; // This is the full filename argument
+            
+            // If the user provides quotes for export, interpret the path inside the quotes.
+            if (filename.length() >= 2 && filename.front() == '"' && filename.back() == '"') {
+                filename = filename.substr(1, filename.length() - 2);
+            }
+            
             std::string export_message = interpreter.exportVariables(filename, history); // 传递历史记录
             printToResultView(export_message, Color::YELLOW);
             statusMessage = export_message;
@@ -261,9 +291,46 @@ void TuiApp::executeCommand(const std::string &input)
         }
 
         // 处理import命令
-        if (commandStr == "import" && commandArgs.size() == 1) {
-            std::string filename = commandArgs[0];
-            auto import_result = interpreter.importVariables(filename);
+        if (commandStr == "import") {
+            // Extract the argument part directly from processedInput
+            std::string argument_part;
+            size_t cmd_len = commandStr.length();
+            if (processedInput.length() > cmd_len) {
+                argument_part = processedInput.substr(cmd_len);
+                // Trim leading whitespace from the argument part
+                size_t first_char_idx = argument_part.find_first_not_of(" \t");
+                if (first_char_idx != std::string::npos) {
+                    argument_part = argument_part.substr(first_char_idx);
+                } else {
+                    // Only whitespace after command, treat as no argument
+                    argument_part.clear();
+                }
+            }
+
+            // Remove trailing semicolon if present on the argument itself
+            if (!argument_part.empty() && argument_part.back() == ';') {
+                argument_part.pop_back();
+            }
+            
+            if (argument_part.empty()) {
+                 throw std::runtime_error("import 命令需要一个文件名参数。用法: import <\"文件名\"> 或 import <文件名>");
+            }
+
+            std::string filename_arg = argument_part; // This is the full filename argument
+            std::string filename_to_import;
+
+            // 检查文件名参数是否被双引号包围
+            if (filename_arg.length() >= 2 && filename_arg.front() == '"' && filename_arg.back() == '"') {
+                // 如果是，则去除双引号
+                filename_to_import = filename_arg.substr(1, filename_arg.length() - 2);
+                LOG_INFO("Importing from (quoted): " + filename_to_import);
+            } else {
+                // 否则，按原样处理
+                filename_to_import = filename_arg;
+                LOG_INFO("Importing from: " + filename_to_import);
+            }
+
+            auto import_result = interpreter.importVariables(filename_to_import);
             std::string import_message = import_result.first;
             const auto& imported_cmds_from_file = import_result.second; // 文件中的顺序 (最新在前)
 

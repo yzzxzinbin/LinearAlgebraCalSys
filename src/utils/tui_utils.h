@@ -10,6 +10,7 @@ struct PrintableListItem {
     std::string indentString;
     std::string iconGlyph;
     RGBColor iconColor; // Changed from Color to RGBColor
+    RGBColor indentColor; // 新增：用于缩进/树结构字符的颜色
     std::string textWithoutIcon;
     std::string fullDisplayStringForMatching; // Used for specialItemText matching against the original full display string
 };

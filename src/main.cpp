@@ -49,8 +49,9 @@ int main()
         if (!selectedFile.empty()) {
             LOG_INFO("启动界面选择了文件: " + selectedFile);
             // 准备 import 命令。文件名应为简单标识符。
-            std::string importCommand = "import ";
-            importCommand += selectedFile; // 例如: "import workenv1"
+            std::string importCommand = "import \""; // 在文件名前添加 "import \""
+            importCommand += selectedFile;      // 添加文件名
+            importCommand += "\"";               // 在文件名后添加 "
             initialCommandToRun = importCommand;
         } else {
             LOG_INFO("启动界面未选择文件或已退出 (ESC 或选择了 NULL 选项)");

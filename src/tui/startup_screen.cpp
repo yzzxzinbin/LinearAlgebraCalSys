@@ -10,7 +10,16 @@
 namespace fs = std::filesystem;
 
 // 定义 NULL 选项的文本
-const std::string StartupScreen::NULL_WORKSPACE_OPTION_TEXT = " -------- NONE -------- ";
+const std::string StartupScreen::NULL_WORKSPACE_OPTION_TEXT = "╭────── NONE ───────"; // 使用边框样式";
+
+// Tree drawing characters
+const std::string TREE_BRANCH_MIDDLE = "├─"; // Branch for a middle child
+const std::string TREE_BRANCH_LAST   = "╰─"; // Branch for the last child
+const std::string TREE_STEM_VERTICAL = "│  "; // Vertical line for an ongoing stem (2 spaces after |)
+const std::string TREE_STEM_EMPTY    = "   "; // Empty space for a stem that ended (3 spaces)
+
+// 新增：定义用于树结构字符的淡白色
+const RGBColor TREE_STRUCTURE_COLOR = {120, 120, 120}; // 淡灰色/淡白色
 
 // 新增：获取文件图标颜色的辅助方法实现
 RGBColor StartupScreen::getIconColorForFile(const std::string &filename) { // Return type changed
@@ -43,7 +52,7 @@ RGBColor StartupScreen::getIconColorForFile(const std::string &filename) { // Re
     if (ext_str == ".ppt" || ext_str == ".pptx") return {211, 72, 47}; // Office Red/Orange
 
     if (textExtensions.count(ext_str)) return {170, 170, 170}; // Light Gray
-    if (resourceExtensions.count(ext_str)) return {100, 100, 255}; // A shade of blue
+    if (resourceExtensions.count(ext_str)) return {90, 130, 180}; // A more desaturated blue
     if (executableExtensions.count(ext_str)) return {220, 220, 220}; // Light gray/white for executables
     
     return {255, 255, 255}; // Default color for other file icons (White)
@@ -125,38 +134,40 @@ std::string StartupScreen::getIconForFile(const std::string &filename)
 }
 
 // Helper to build the display string for a ListItem
-void StartupScreen::buildDisplayString(ListItem &item)
+void StartupScreen::buildDisplayString(ListItem& item, const std::string& stemAtItemLevel)
 {
-    item.indentString.clear();
-    for (int i = 0; i < item.depth; ++i)
-    {
-        item.indentString += INDENT_STRING;
-    }
-
-    std::string namePart = item.name; // Original name for files/dirs, or special text
+    item.iconColor = {255, 255, 255}; // Default icon color
+    item.indentColor = TREE_STRUCTURE_COLOR; // 设置缩进/树结构字符的颜色
 
     if (item.itemType == ListItem::Type::DIRECTORY)
     {
+        item.constructedIndentString = stemAtItemLevel + (item.isLastAmongSiblings ? TREE_BRANCH_LAST : TREE_BRANCH_MIDDLE);
+        item.stemForMyChildren = stemAtItemLevel + (item.isLastAmongSiblings ? TREE_STEM_EMPTY : TREE_STEM_VERTICAL);
         item.iconGlyph = item.isExpanded ? ICON_DIR_OPEN : ICON_DIR_CLOSED;
         item.iconColor = {255, 165, 0}; // Orange using RGB
-        item.displayName = item.indentString + " " + item.iconGlyph + " " + namePart;
+        item.displayName = item.constructedIndentString + item.iconGlyph + " " + item.name;
     }
     else if (item.itemType == ListItem::Type::FILE)
     {
-        item.iconGlyph = getIconForFile(item.name); // item.name is filename
+        item.constructedIndentString = stemAtItemLevel + (item.isLastAmongSiblings ? TREE_BRANCH_LAST : TREE_BRANCH_MIDDLE);
+        item.stemForMyChildren = stemAtItemLevel + (item.isLastAmongSiblings ? TREE_STEM_EMPTY : TREE_STEM_VERTICAL); // Though files don't have children, store consistently
+        item.iconGlyph = getIconForFile(item.name);
         item.iconColor = getIconColorForFile(item.name);
-        item.displayName = item.indentString + " " + item.iconGlyph + " " + namePart;
+        item.displayName = item.constructedIndentString + item.iconGlyph + " " + item.name;
     }
     else if (item.itemType == ListItem::Type::SPECIAL)
     {
-        item.iconGlyph = ""; // No icon for special items like "None"
-        item.iconColor = {255, 255, 255}; // Default to white, or a specific RGB if needed
-        item.displayName = item.indentString + namePart; // Special items might not have leading/trailing spaces around icon
+        item.constructedIndentString = ""; // No tree prefix for special items
+        item.stemForMyChildren = "";       // No children stem
+        item.iconGlyph = "";               // No icon
+        // item.iconColor remains default white, though not used
+        // item.indentColor will be TREE_STRUCTURE_COLOR but constructedIndentString is empty
+        item.displayName = item.name; // Special items might not have leading/trailing spaces around icon
     }
 }
 
 // Helper to get children of a given path and populate a list
-void StartupScreen::getChildrenOfPath(const std::string &path, int depth, std::vector<ListItem> &childrenList)
+void StartupScreen::getChildrenOfPath(const std::string& path, int childrenDepth, const std::string& stemForChildrenToUse, std::vector<ListItem>& childrenList)
 {
     std::vector<fs::directory_entry> entries;
     try
@@ -192,24 +203,22 @@ void StartupScreen::getChildrenOfPath(const std::string &path, int depth, std::v
     for (const auto &entry : entries)
     {
         std::string itemName = entry.path().filename().string();
-        // Store absolute paths to avoid issues with relative paths later
         std::string itemFullPath = fs::absolute(entry.path()).string();
+        bool isLast = (&entry == &entries.back()); // Check if this is the last entry in the current directory's list
 
         if (fs::is_directory(entry.status()))
         {
-            ListItem dirItem(itemName, "", itemFullPath, ListItem::Type::DIRECTORY, depth, false);
-            buildDisplayString(dirItem); // This will set iconGlyph, iconColor, indentString, displayName
+            ListItem dirItem(itemName, "", itemFullPath, ListItem::Type::DIRECTORY, childrenDepth, false);
+            dirItem.isLastAmongSiblings = isLast;
+            buildDisplayString(dirItem, stemForChildrenToUse);
             childrenList.push_back(dirItem);
         }
         else if (fs::is_regular_file(entry.status()))
         {
             std::string ext = entry.path().extension().string();
-            // 将扩展名转为小写以便比较
             std::transform(ext.begin(), ext.end(), ext.begin(),
-                           [](unsigned char c)
-                           { return std::tolower(c); });
+                           [](unsigned char c){ return std::tolower(c); });
 
-            // Corrected and expanded allowedExtensions
             const static std::unordered_set<std::string> allowedExtensions = {
                 "", ".txt", ".cpp", ".json", ".h", ".hpp", ".log", ".md", ".csv",
                 ".py", ".js", ".xml", ".c", ".html", ".css", 
@@ -221,8 +230,9 @@ void StartupScreen::getChildrenOfPath(const std::string &path, int depth, std::v
 
             if (allowedExtensions.count(ext))
             {
-                ListItem fileItem(itemName, "", itemFullPath, ListItem::Type::FILE, depth, false);
-                buildDisplayString(fileItem); // This will set iconGlyph, iconColor, indentString, displayName
+                ListItem fileItem(itemName, "", itemFullPath, ListItem::Type::FILE, childrenDepth, false);
+                fileItem.isLastAmongSiblings = isLast;
+                buildDisplayString(fileItem, stemForChildrenToUse);
                 childrenList.push_back(fileItem);
             }
         }
@@ -239,16 +249,29 @@ void StartupScreen::toggleDirectoryExpansion(int listIndex)
         return;
 
     item.isExpanded = !item.isExpanded;
-    buildDisplayString(item); // Update icon in displayName and other fields
+    // Re-build display string for the toggled item itself to update its icon and potentially prefix if logic changes
+    // The stemAtItemLevel for this item doesn't change, so we need to find what it was.
+    // This is tricky if buildDisplayString needs the original stem.
+    // For now, assume its constructedIndentString and stemForMyChildren are correct and only icon changes.
+    // A better way: find its parent's stemForMyChildren or reconstruct.
+    // Simplification: its own stem parts (constructedIndentString, stemForMyChildren) are already correct from its creation.
+    // We only need to update its icon and thus displayName.
+    // Let's find the stem that *led* to this item.
+    // The stem *at* item's level is item.constructedIndentString minus the "├── " or "└── " part.
+    std::string stemLeadingToItem;
+    size_t branchLen = TREE_BRANCH_MIDDLE.length(); // Assume middle and last have same length
+    if (item.constructedIndentString.length() >= branchLen) {
+        stemLeadingToItem = item.constructedIndentString.substr(0, item.constructedIndentString.length() - branchLen);
+    }
+    buildDisplayString(item, stemLeadingToItem); // Rebuild with correct icon after expansion toggle
+
 
     if (item.isExpanded)
     {
-        // Expand: insert children
         std::vector<ListItem> children;
-        getChildrenOfPath(item.fullPath, item.depth + 1, children);
+        getChildrenOfPath(item.fullPath, item.depth + 1, item.stemForMyChildren, children);
         if (!children.empty())
         {
-            // Insert children right after the parent directory item
             fileList_.insert(fileList_.begin() + listIndex + 1, children.begin(), children.end());
         }
     }
@@ -289,6 +312,8 @@ StartupScreen::StartupScreen(const std::string &bannerFilePath, const std::strin
       lastTermRows_(0), lastTermCols_(0), // 初始化上次终端尺寸
       bannerFileConfigPath_(bannerFilePath), workDirConfigPath_(workDirPath)
 {
+
+    std::iostream::sync_with_stdio(false); // Disable sync with C stdio for performance
     try
     {
         // Ensure workDirectoryPath_ is absolute and valid.
@@ -342,6 +367,12 @@ StartupScreen::StartupScreen(const std::string &bannerFilePath, const std::strin
     }
 }
 
+// 析构函数
+StartupScreen::~StartupScreen()
+{
+    // std::iostream::sync_with_stdio(true); // Re-enable sync with C stdio
+}
+
 void StartupScreen::loadBanner(const std::string &filePath)
 {
     bannerLines_ = TuiUtils::readFileLines(filePath);
@@ -357,22 +388,45 @@ void StartupScreen::loadInitialFiles()
 {
     fileList_.clear();
 
-    // For "None" option, name is the text itself.
-    ListItem noneItem(NULL_WORKSPACE_OPTION_TEXT, "", "", ListItem::Type::SPECIAL, 0);
-    buildDisplayString(noneItem);
-    fileList_.push_back(noneItem);
-
-    // workDirectoryPath_ is now guaranteed to be set (even if to current path as fallback)
-    // or potentially empty if all fallbacks failed (highly unlikely but good to be aware).
+    std::vector<ListItem> topLevelItems;
     if (!workDirectoryPath_.empty())
     {
-        std::vector<ListItem> topLevelItems;
-        getChildrenOfPath(workDirectoryPath_, 0, topLevelItems);
+        // For items at depth 0, the stem leading to them is empty.
+        getChildrenOfPath(workDirectoryPath_, 0, "", topLevelItems);
+    }
+
+    // Add "None" option first. It's at depth 0.
+    // Its isLastAmongSiblings depends on whether topLevelItems exist.
+    ListItem noneItem(NULL_WORKSPACE_OPTION_TEXT, "", "", ListItem::Type::SPECIAL, 0);
+    noneItem.isLastAmongSiblings = topLevelItems.empty(); // "None" is last if no FS items follow.
+    buildDisplayString(noneItem, ""); // Stem for depth 0 items is empty.
+    fileList_.push_back(noneItem);
+
+    // If "None" was added and FS items exist, "None" is not the last.
+    // The isLastAmongSiblings for items in topLevelItems is relative to *their own group*.
+    // This is generally fine as "None" has no tree lines.
+    // If topLevelItems exist, and "None" was marked as not last, the first item in topLevelItems
+    // might need its isLastAmongSiblings re-evaluated if it was the *only* item in topLevelItems.
+    // However, getChildrenOfPath correctly sets isLastAmongSiblings for the items *it generates*.
+    // If "None" is present, and topLevelItems has only one item, that one item is correctly marked as last *within its group*.
+    // The visual effect should be:
+    // -------- NONE --------
+    // └── file1 (if only one file/dir at root)
+    // or
+    // -------- NONE --------
+    // ├── dir1
+    // └── file2
+
+    if (!topLevelItems.empty()) {
+        if (fileList_.size() == 1 && fileList_[0].itemType == ListItem::Type::SPECIAL) { // "None" is currently the only item
+             // If topLevelItems are about to be added, "None" is no longer the last.
+            fileList_[0].isLastAmongSiblings = false;
+            buildDisplayString(fileList_[0], ""); // Rebuild "None" item's display string
+        }
         fileList_.insert(fileList_.end(), topLevelItems.begin(), topLevelItems.end());
     }
 
-    // currentSelection_ and scrollOffset_ will be set/reset after this.
-    // If fileList_ only contains "None", currentSelection_ will be 0.
+
     currentSelection_ = fileList_.empty() ? -1 : 0;
     scrollOffset_ = 0;
 }
@@ -541,9 +595,10 @@ void StartupScreen::drawWideLayout(int termRows, int termCols)
         printableItems.reserve(fileList_.size());
         for (const auto &item : fileList_) {
             TuiUtils::PrintableListItem pli;
-            pli.indentString = item.indentString;
+            pli.indentString = item.constructedIndentString; // Use the new tree-based indent
             pli.iconGlyph = item.iconGlyph;
             pli.iconColor = item.iconColor;
+            pli.indentColor = item.indentColor; // 新增：传递缩进颜色S
             pli.textWithoutIcon = item.name; // Original name or special text
             pli.fullDisplayStringForMatching = item.displayName; // For special item matching
             printableItems.push_back(pli);
@@ -628,9 +683,10 @@ void StartupScreen::drawTallLayout(int termRows, int termCols)
         printableItems.reserve(fileList_.size());
         for (const auto &item : fileList_) {
             TuiUtils::PrintableListItem pli;
-            pli.indentString = item.indentString;
+            pli.indentString = item.constructedIndentString; // Use the new tree-based indent
             pli.iconGlyph = item.iconGlyph;
             pli.iconColor = item.iconColor;
+            pli.indentColor = item.indentColor; // 新增：传递缩进颜色
             pli.textWithoutIcon = item.name; // Original name or special text
             pli.fullDisplayStringForMatching = item.displayName; // For special item matching
             printableItems.push_back(pli);

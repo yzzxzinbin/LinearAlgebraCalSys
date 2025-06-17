@@ -127,63 +127,88 @@ void drawTextList(int r, int c, int h, int w,
             Terminal::setBackground(currentItemBgColor); // Set background for the entire line
 
             size_t currentVisualCol = 0;
-            auto printSegment = [&](const std::string& text, Color fgColor, size_t& visualCol, int maxWidth) {
-                if (visualCol >= static_cast<size_t>(maxWidth)) return;
+            // auto printSegment = [&](const std::string& text, Color fgColor, size_t& visualCol, int maxWidth) { // This helper is not used for indent anymore
+            //     if (visualCol >= static_cast<size_t>(maxWidth)) return;
 
-                std::string segmentToPrint = text;
-                size_t segmentVisualLen = TuiUtils::countUtf8CodePoints(segmentToPrint);
+            //     std::string segmentToPrint = text;
+            //     size_t segmentVisualLen = TuiUtils::countUtf8CodePoints(segmentToPrint);
                 
-                if (visualCol + segmentVisualLen > static_cast<size_t>(maxWidth)) {
-                    segmentToPrint = TuiUtils::trimToVisualWidth(segmentToPrint, maxWidth - visualCol);
-                    segmentVisualLen = TuiUtils::countUtf8CodePoints(segmentToPrint); // Re-evaluate after trim
-                }
+            //     if (visualCol + segmentVisualLen > static_cast<size_t>(maxWidth)) {
+            //         segmentToPrint = TuiUtils::trimToVisualWidth(segmentToPrint, maxWidth - visualCol);
+            //         segmentVisualLen = TuiUtils::countUtf8CodePoints(segmentToPrint); // Re-evaluate after trim
+            //     }
 
-                Terminal::setForeground(fgColor);
-                std::cout << segmentToPrint;
-                visualCol += segmentVisualLen;
-            };
+            //     Terminal::setForeground(fgColor);
+            //     std::cout << segmentToPrint;
+            //     visualCol += segmentVisualLen;
+            // };
             
-            // Print Indent
-            printSegment(pItem.indentString, currentItemFgColor, currentVisualCol, w);
+            // Print Indent using its specific RGB color
+            if (!pItem.indentString.empty() && currentVisualCol < static_cast<size_t>(w)) {
+                std::string indentToPrint = pItem.indentString;
+                size_t indentVisualLen = TuiUtils::countUtf8CodePoints(indentToPrint);
 
+                if (currentVisualCol + indentVisualLen > static_cast<size_t>(w)) {
+                    indentToPrint = TuiUtils::trimToVisualWidth(indentToPrint, w - currentVisualCol);
+                    indentVisualLen = TuiUtils::countUtf8CodePoints(indentToPrint); // Re-evaluate
+                }
+                if (indentVisualLen > 0) {
+                    Terminal::setForegroundRGB(pItem.indentColor.r, pItem.indentColor.g, pItem.indentColor.b);
+                    std::cout << indentToPrint;
+                    currentVisualCol += indentVisualLen;
+                }
+            }
+            
             // Print Icon (if any)
             if (!pItem.iconGlyph.empty()) {
-                printSegment(" ", currentItemFgColor, currentVisualCol, w); // Space before icon
-                
-                // Use RGBColor for the icon
-                // The icon's RGB color is independent of selection/special status for now.
-                // If icon color should also change when selected/special, add logic here.
-                Terminal::setForegroundRGB(pItem.iconColor.r, pItem.iconColor.g, pItem.iconColor.b);
-                
-                // Temporarily print the icon glyph directly as printSegment expects a Color enum for fg
-                // and we need to use setForegroundRGB.
-                // We need to ensure the visual width calculation and trimming is still respected.
-                std::string iconToPrint = pItem.iconGlyph;
-                size_t iconVisualLen = TuiUtils::countUtf8CodePoints(iconToPrint);
-                bool iconPrinted = false;
-
+                // Space before icon
                 if (currentVisualCol < static_cast<size_t>(w)) {
+                    Terminal::setForeground(currentItemFgColor); // Use current item's text color for space
+                    std::cout << " ";
+                    currentVisualCol++;
+                }
+                
+                // Icon itself (with its own RGB color)
+                if (currentVisualCol < static_cast<size_t>(w)) {
+                    Terminal::setForegroundRGB(pItem.iconColor.r, pItem.iconColor.g, pItem.iconColor.b);
+                    
+                    std::string iconToPrint = pItem.iconGlyph;
+                    size_t iconVisualLen = TuiUtils::countUtf8CodePoints(iconToPrint);
+                    bool iconPrinted = false;
+
                     if (currentVisualCol + iconVisualLen > static_cast<size_t>(w)) {
                         iconToPrint = TuiUtils::trimToVisualWidth(iconToPrint, w - currentVisualCol);
-                        iconVisualLen = TuiUtils::countUtf8CodePoints(iconToPrint); // Re-evaluate after trim
+                        iconVisualLen = TuiUtils::countUtf8CodePoints(iconToPrint); 
                     }
                     if (iconVisualLen > 0) {
                         std::cout << iconToPrint;
                         currentVisualCol += iconVisualLen;
                         iconPrinted = true;
                     }
-                }
-                
-                // After printing icon with RGB, reset foreground for subsequent space/text
-                Terminal::setForeground(currentItemFgColor); 
-                
-                if (iconPrinted) { // Only print space after icon if icon was printed
-                    printSegment(" ", currentItemFgColor, currentVisualCol, w); // Space after icon
+                    
+                    // Space after icon (if icon was printed)
+                    if (iconPrinted && currentVisualCol < static_cast<size_t>(w)) {
+                        Terminal::setForeground(currentItemFgColor); // Use current item's text color for space
+                        std::cout << " ";
+                        currentVisualCol++;
+                    }
                 }
             }
             
-            // Print Text
-            printSegment(pItem.textWithoutIcon, currentItemFgColor, currentVisualCol, w);
+            // Print Text using currentItemFgColor
+            if (currentVisualCol < static_cast<size_t>(w)) {
+                Terminal::setForeground(currentItemFgColor);
+                std::string textToPrint = pItem.textWithoutIcon;
+                size_t textVisualLen = TuiUtils::countUtf8CodePoints(textToPrint);
+
+                if (currentVisualCol + textVisualLen > static_cast<size_t>(w)) {
+                    textToPrint = TuiUtils::trimToVisualWidth(textToPrint, w - currentVisualCol);
+                    // textVisualLen = TuiUtils::countUtf8CodePoints(textToPrint); // Not strictly needed after trim for this segment
+                }
+                std::cout << textToPrint;
+                currentVisualCol += TuiUtils::countUtf8CodePoints(textToPrint); // Use actual printed length
+            }
+
 
             // Fill remaining space on the line
             if (currentVisualCol < static_cast<size_t>(w)) {
