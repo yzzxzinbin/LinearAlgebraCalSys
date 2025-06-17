@@ -4,6 +4,7 @@
 #include <iostream>       // For std::cout, used by Terminal output
 #include <filesystem>     // C++17 for directory listing
 #include <algorithm>      // For std::sort, std::max
+#include <unordered_set>  // 新增：用于文件扩展名白名单
 
 namespace fs = std::filesystem;
 
@@ -26,24 +27,6 @@ std::vector<std::string> readFileLines(const std::string& filePath) {
     return lines;
 }
 
-std::vector<std::string> listFilesNoExt(const std::string& directoryPath) {
-    std::vector<std::string> files;
-    try {
-        for (const auto& entry : fs::directory_iterator(directoryPath)) {
-            if (entry.is_regular_file()) {
-                if (!entry.path().has_extension()) {
-                    files.push_back(entry.path().filename().string());
-                }
-            }
-        }
-    } catch (const fs::filesystem_error& e) {
-        // 可以选择记录错误日志
-        // std::cerr << "Error listing files: " << e.what() << std::endl;
-    }
-    std::sort(files.begin(), files.end()); // 对文件名进行排序
-    return files;
-}
-
 void drawText(int r, int c, const std::string& text, Color fg, Color bg) {
     Terminal::setCursor(r, c);
     Terminal::setForeground(fg);
@@ -64,11 +47,11 @@ void fillRect(int r, int c, int h, int w, char fillChar, Color fg, Color bg) {
     Terminal::resetColor();
 }
 
-void drawBox(int r, int c, int h, int w, const std::string& title, Color borderColor) {
+void drawBox(int r, int c, int h, int w, const std::string& title, Color borderColor, Color bgColor) {
     if (h < 2 || w < 2) return;
 
     Terminal::setForeground(borderColor);
-    Terminal::setBackground(Color::DEFAULT); // Assuming black background for box lines
+    Terminal::setBackground(bgColor); // 使用传入的 bgColor
 
     // Corners
     Terminal::setCursor(r, c); std::cout << "╭";
@@ -101,6 +84,7 @@ void drawBox(int r, int c, int h, int w, const std::string& title, Color borderC
             displayTitle = displayTitle.substr(0, maxTitleLen);
         }
         Terminal::setCursor(r, titleX);
+        Terminal::setBackground(bgColor); // 确保标题背景也是 bgColor
         // Ensure title doesn't overwrite box corners if too long
         if (titleX + displayTitle.length() < static_cast<size_t>(c + w -1) ) {
              std::cout << displayTitle;
@@ -121,15 +105,26 @@ void drawTextList(int r, int c, int h, int w, const std::vector<std::string>& it
         Terminal::setCursor(r + i, c);
         int itemIdx = scrollOffset + i;
         if (itemIdx >= 0 && itemIdx < static_cast<int>(items.size())) {
-            const std::string& originalItemText = items[itemIdx]; // 用于比较的原始文本
-            std::string itemTextToDisplay = originalItemText;    // 用于显示的文本（可能被截断/填充）
+            const std::string& originalItemText = items[itemIdx]; 
+            std::string itemTextToDisplay = originalItemText;    
 
-            // 处理显示宽度（基于字符长度，非视觉宽度，与现有逻辑保持一致）
-            if (itemTextToDisplay.length() > static_cast<size_t>(w)) {
-                itemTextToDisplay = itemTextToDisplay.substr(0, w);
-            } else {
-                itemTextToDisplay.append(w - itemTextToDisplay.length(), ' '); // 用空格填充以覆盖旧内容
+            // 使用视觉宽度进行处理
+            size_t visualLen = TuiUtils::countUtf8CodePoints(itemTextToDisplay);
+
+            if (visualLen > static_cast<size_t>(w)) {
+                itemTextToDisplay = TuiUtils::trimToVisualWidth(itemTextToDisplay, w);
+                // trimToVisualWidth 应该返回一个视觉宽度为 w 的字符串（或尽可能接近）
+                // 为确保准确，可以重新计算修剪后的视觉长度，但通常假设trim函数是准确的
+                visualLen = TuiUtils::countUtf8CodePoints(itemTextToDisplay); 
             }
+
+            // 基于视觉宽度进行填充
+            std::string padding;
+            if (visualLen < static_cast<size_t>(w)) {
+                padding.assign(w - visualLen, ' ');
+            }
+            itemTextToDisplay += padding;
+
 
             bool isSpecialItem = (!specialItemText.empty() && originalItemText == specialItemText);
 
@@ -160,7 +155,7 @@ void drawTextLines(int r, int c, int h, int w, const std::vector<std::string>& l
     if (h <= 0 || w <= 0) return;
     
     Terminal::setForeground(textColor);
-    Terminal::setBackground(bgColor);
+    Terminal::setBackground(bgColor); // 确保背景色被正确设置
 
     for (int i = 0; i < h; ++i) {
         Terminal::setCursor(r + i, c);
@@ -180,6 +175,7 @@ void drawTextLines(int r, int c, int h, int w, const std::vector<std::string>& l
             std::cout << lineToDraw;
         } else {
             // 如果行数少于高度，用背景色清除剩余行
+            Terminal::setBackground(bgColor); // 确保清除时使用正确的背景色
             std::cout << std::string(w, ' ');
         }
     }

@@ -8,11 +8,8 @@ namespace TuiUtils {
 // 从文件读取所有行
 std::vector<std::string> readFileLines(const std::string& filePath);
 
-// 列出指定目录中没有扩展名的文件
-std::vector<std::string> listFilesNoExt(const std::string& directoryPath);
-
 // 绘制一个带可选标题的边框
-void drawBox(int r, int c, int h, int w, const std::string& title = "", Color borderColor = Color::WHITE);
+void drawBox(int r, int c, int h, int w, const std::string& title = "", Color borderColor = Color::WHITE, Color bgColor = Color::DEFAULT);
 
 // 在指定区域内绘制一个字符串列表，支持高亮选中项和滚动
 void drawTextList(int r, int c, int h, int w, const std::vector<std::string>& items,

@@ -62,6 +62,10 @@ public:
     
     // 设置背景色
     static void setBackground(Color color);
+
+    // RGB颜色设置（用于更复杂的颜色支持）
+    static void setForegroundRGB(uint8_t r, uint8_t g, uint8_t b);
+    static void setBackgroundRGB(uint8_t r, uint8_t g, uint8_t b);
     
     // 重置颜色
     static void resetColor();

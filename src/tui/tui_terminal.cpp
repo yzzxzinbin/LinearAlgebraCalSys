@@ -105,6 +105,19 @@ void Terminal::setBackground(Color color) {
     std::cout << "\033[" << colorCode << "m";
 }
 
+// 单独新增 RGB 版本
+void Terminal::setForegroundRGB(uint8_t r, uint8_t g, uint8_t b) {
+    std::cout << "\033[38;2;" << static_cast<int>(r) << ";" 
+                             << static_cast<int>(g) << ";" 
+                             << static_cast<int>(b) << "m";
+}
+
+void Terminal::setBackgroundRGB(uint8_t r, uint8_t g, uint8_t b) {
+    std::cout << "\033[48;2;" << static_cast<int>(r) << ";" 
+                             << static_cast<int>(g) << ";" 
+                             << static_cast<int>(b) << "m";
+}
+
 // 重置颜色
 void Terminal::resetColor() {
     // 使用ANSI转义序列重置所有属性
@@ -271,6 +284,11 @@ int Terminal::readChar() {
         // 在Linux上，将DELETE键(127)作为退格键处理
         if (c_val == 127) {
             return KEY_BACKSPACE;
+        }
+
+        // 检测 CTRL+A (ASCII 1)
+        if (c_val == 1) { // CTRL+A 通常发送 SOH (Start of Heading), ASCII 值为 1
+            return KEY_CTRL_A;
         }
         
         return (int)c_val;
