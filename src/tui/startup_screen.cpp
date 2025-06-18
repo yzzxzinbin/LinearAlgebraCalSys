@@ -167,26 +167,24 @@ void StartupScreen::buildDisplayString(ListItem& item, const std::string& stemAt
 }
 
 // Helper to get children of a given path and populate a list
-void StartupScreen::getChildrenOfPath(const std::string& path, int childrenDepth, const std::string& stemForChildrenToUse, std::vector<ListItem>& childrenList)
+void StartupScreen::getChildrenOfPath(const fs::path& dirPath, int childrenDepth, const std::string& stemForChildrenToUse, std::vector<ListItem>& childrenList)
 {
     std::vector<fs::directory_entry> entries;
+    // fs::path dirPath(path); // 已经是 path 类型
     try
     {
-        if (!fs::exists(path) || !fs::is_directory(path))
+        if (!fs::exists(dirPath) || !fs::is_directory(dirPath))
         {
-            // Log or handle cases where path is not a directory, e.g., when trying to get children of a file.
-            // For initial load, workDirectoryPath_ is checked in constructor.
-            // For recursive calls, 'path' comes from a ListItem known to be a directory.
             return;
         }
-        for (const auto &entry : fs::directory_iterator(path))
+        for (const auto &entry : fs::directory_iterator(dirPath))
         {
             entries.push_back(entry);
         }
     }
     catch (const fs::filesystem_error &e)
     {
-        LOG_WARNING("Error accessing directory " + path + ": " + std::string(e.what()));
+        LOG_WARNING("Error accessing directory " + dirPath.string() + ": " + std::string(e.what()));
         return;
     }
 
@@ -203,9 +201,8 @@ void StartupScreen::getChildrenOfPath(const std::string& path, int childrenDepth
     for (const auto &entry : entries)
     {
         std::string itemName = entry.path().filename().string();
-        std::string itemFullPath = fs::absolute(entry.path()).string();
-        bool isLast = (&entry == &entries.back()); // Check if this is the last entry in the current directory's list
-
+        fs::path itemFullPath = fs::absolute(entry.path()); // 保持为 path 类型
+        bool isLast = (&entry == &entries.back());
         if (fs::is_directory(entry.status()))
         {
             ListItem dirItem(itemName, "", itemFullPath, ListItem::Type::DIRECTORY, childrenDepth, false);
@@ -269,7 +266,7 @@ void StartupScreen::toggleDirectoryExpansion(int listIndex)
     if (item.isExpanded)
     {
         std::vector<ListItem> children;
-        getChildrenOfPath(item.fullPath, item.depth + 1, item.stemForMyChildren, children);
+        getChildrenOfPath(item.fullPath, item.depth + 1, item.stemForMyChildren, children); // 直接传递 path
         if (!children.empty())
         {
             fileList_.insert(fileList_.begin() + listIndex + 1, children.begin(), children.end());
@@ -387,14 +384,11 @@ void StartupScreen::loadBanner(const std::string &filePath)
 void StartupScreen::loadInitialFiles()
 {
     fileList_.clear();
-
     std::vector<ListItem> topLevelItems;
     if (!workDirectoryPath_.empty())
     {
-        // For items at depth 0, the stem leading to them is empty.
-        getChildrenOfPath(workDirectoryPath_, 0, "", topLevelItems);
+        getChildrenOfPath(fs::path(workDirectoryPath_), 0, "", topLevelItems); // 传递 path 类型
     }
-
     // Add "None" option first. It's at depth 0.
     // Its isLastAmongSiblings depends on whether topLevelItems exist.
     ListItem noneItem(NULL_WORKSPACE_OPTION_TEXT, "", "", ListItem::Type::SPECIAL, 0);
@@ -453,7 +447,7 @@ std::string StartupScreen::run()
                 const auto &selectedItem = fileList_[currentSelection_];
                 if (selectedItem.itemType == ListItem::Type::FILE)
                 {
-                    selectedPath = selectedItem.fullPath;
+                    selectedPath = selectedItem.fullPath.string(); // 修正：加 .string()
                 }
                 else if (selectedItem.itemType == ListItem::Type::SPECIAL && selectedItem.name == NULL_WORKSPACE_OPTION_TEXT)
                 {

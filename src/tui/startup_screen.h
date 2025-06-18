@@ -15,7 +15,7 @@
 struct ListItem {
     std::string name;          // Original name (e.g., "myfile", "mydir")
     std::string displayName;   // Formatted name for display (e.g., "  📁> mydir")
-    std::string fullPath;      // Full path to the item
+    std::filesystem::path fullPath; // 修改类型为 path
     enum class Type { FILE, DIRECTORY, SPECIAL } itemType;
     bool isExpanded;           // For directories: true if expanded, false otherwise
     int depth;                 // Indentation depth level
@@ -28,7 +28,7 @@ struct ListItem {
     bool isLastAmongSiblings; // True if this item is the last in its current sibling group
     std::string stemForMyChildren; // Stem prefix for children of this item, e.g., "│     "
 
-    ListItem(std::string n, std::string dispN_unused, std::string fp, Type t, int d, bool exp = false)
+    ListItem(std::string n, std::string dispN_unused, std::filesystem::path fp, Type t, int d, bool exp = false)
         : name(std::move(n)), fullPath(std::move(fp)),
           itemType(t), isExpanded(exp), depth(d), iconColor({255, 255, 255}), 
           indentColor({180, 180, 180}), // 初始化 indentColor，例如使用 TREE_STRUCTURE_COLOR
@@ -56,7 +56,7 @@ private:
 
     // Helper methods for list management
     void buildDisplayString(ListItem& item, const std::string& stemAtItemLevel); // Added stemAtItemLevel parameter
-    void getChildrenOfPath(const std::string& path, int childrenDepth, const std::string& stemForChildrenToUse, std::vector<ListItem>& childrenList); // Parameters changed
+    void getChildrenOfPath(const std::filesystem::path& path, int childrenDepth, const std::string& stemForChildrenToUse, std::vector<ListItem>& childrenList); // 参数类型改为 path
     void toggleDirectoryExpansion(int listIndex);
     static std::string getIconForFile(const std::string& filename);
     // New helper method for icon color
