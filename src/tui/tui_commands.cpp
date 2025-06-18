@@ -456,14 +456,25 @@ void TuiApp::executeCommand(const std::string &input)
         // 处理vars命令
         if (processedInput == "vars" || processedInput == "vars;")
         {
-            // showVariables 内部使用 resultRow
-            showVariables();
+            // 启动增强型变量预览器
+            if (!matrixEditor && !variableViewer) { // 确保没有其他编辑器在运行
+                variableViewer = std::make_unique<EnhancedVariableViewer>(interpreter, terminalRows, terminalCols);
+                statusMessage = variableViewer->getStatusMessage();
+                initUI(); // 重绘UI以适应预览器
+            }
             return;
         }
         // 添加对vars -l命令的处理
         else if (processedInput == "vars -l" || processedInput == "vars -l;")
         {
             showVariables(true); // 传入true表示只列出变量名和类型
+            // 新增：在vars -l末尾显示变量总数
+            const auto &vars = interpreter.getVariables();
+            Terminal::setCursor(resultRow, 0);
+            Terminal::setForeground(Color::CYAN);
+            std::cout << "\n总计: " << vars.size() << " 个变量" << std::endl;
+            Terminal::resetColor();
+            resultRow += 2; // 为换行和总计行更新 resultRow
             return;
         }
 

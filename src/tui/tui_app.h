@@ -12,6 +12,7 @@
 #include "../determinant_expansion.h"
 #include "tui_terminal.h"
 #include "enhanced_matrix_editor.h"
+#include "enhanced_variable_viewer.h" // 新增：包含变量预览器
 #include "tui_suggestion_box.h" // 新增：包含候选框头文件
 #include "../utils/logger.h" // 新增：包含日志记录头文件
 #include "../utils/tui_utils.h" // 新增：包含TUI工具函数头文件
@@ -56,18 +57,10 @@ private:
     ExpansionHistory currentExpHistory;
     bool isExpansionHistory;
 
-    // 移除旧的矩阵编辑模式相关状态
-    // bool inMatrixEditMode;
-    // std::string editingVariableName;
-    // Variable editingVariableCopy; 
-    // bool editingIsMatrix;         
-    // size_t editCursorRow;         
-    // size_t editCursorCol;         
-    // std::string currentCellInput;   
-    // bool cellInputActive;         
-
     // 新增：增强型矩阵编辑器实例
     std::unique_ptr<EnhancedMatrixEditor> matrixEditor;
+    // 新增：增强型变量预览器实例  
+    std::unique_ptr<EnhancedVariableViewer> variableViewer;
     // 新增：命令候选框实例
     std::unique_ptr<SuggestionBox> suggestionBox;
     
@@ -82,8 +75,6 @@ private:
     // 处理命令和输入
     void handleSpecialKey(int key);
     void navigateHistory(bool up);
-    // 移除旧的矩阵编辑模式输入处理函数
-    // void handleMatrixEditInput(int key); 
     
     // 命令执行函数
     void showHelp();
@@ -103,10 +94,6 @@ private:
     void displayCurrentStep();
     void drawStepProgressBar();
 
-    // 移除旧的矩阵编辑模式相关函数
-    // void enterMatrixEditMode(const std::string& varName, bool isNew, bool isMatrix, int rows = 0, int cols = 0);
-    // void exitMatrixEditMode(bool saveChanges);
-    // void drawMatrixEditor();
     std::string generateNewVariableName(bool isMatrix); // 保持此辅助函数
     
     // 辅助函数

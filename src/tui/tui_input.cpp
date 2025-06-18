@@ -36,6 +36,20 @@ void TuiApp::handleInput()
         return;
     }
     
+    // 如果变量预览器激活，将输入传递给它
+    if (variableViewer) {
+        EnhancedVariableViewer::ViewerResult result = variableViewer->handleInput(key);
+        statusMessage = variableViewer->getStatusMessage(); // 获取预览器的状态消息
+
+        if (result == EnhancedVariableViewer::ViewerResult::EXIT) {
+            statusMessage = "已退出变量预览器";
+            variableViewer.reset();
+            initUI(); // 重绘标准UI
+        }
+        // 如果是 CONTINUE，状态栏会在 run() 循环中重绘
+        return;
+    }
+    
     // 优先处理候选框输入
     if (suggestionBox->isVisible()) {
         SuggestionAction action = suggestionBox->handleKey(key);
