@@ -131,11 +131,11 @@ void drawTextList(int r, int c, int h, int w,
             //     if (visualCol >= static_cast<size_t>(maxWidth)) return;
 
             //     std::string segmentToPrint = text;
-            //     size_t segmentVisualLen = TuiUtils::countUtf8CodePoints(segmentToPrint);
+            //     size_t segmentVisualLen = TuiUtils::calculateUtf8VisualWidth(segmentToPrint); // MODIFIED
                 
             //     if (visualCol + segmentVisualLen > static_cast<size_t>(maxWidth)) {
-            //         segmentToPrint = TuiUtils::trimToVisualWidth(segmentToPrint, maxWidth - visualCol);
-            //         segmentVisualLen = TuiUtils::countUtf8CodePoints(segmentToPrint); // Re-evaluate after trim
+            //         segmentToPrint = TuiUtils::trimToUtf8VisualWidth(segmentToPrint, maxWidth - visualCol); // MODIFIED
+            //         segmentVisualLen = TuiUtils::calculateUtf8VisualWidth(segmentToPrint); // Re-evaluate after trim // MODIFIED
             //     }
 
             //     Terminal::setForeground(fgColor);
@@ -146,16 +146,16 @@ void drawTextList(int r, int c, int h, int w,
             // Print Indent using its specific RGB color
             if (!pItem.indentString.empty() && currentVisualCol < static_cast<size_t>(w)) {
                 std::string indentToPrint = pItem.indentString;
-                size_t indentVisualLen = TuiUtils::countUtf8CodePoints(indentToPrint);
+                size_t indentActualVisualLen = TuiUtils::calculateUtf8VisualWidth(indentToPrint); // MODIFIED
 
-                if (currentVisualCol + indentVisualLen > static_cast<size_t>(w)) {
-                    indentToPrint = TuiUtils::trimToVisualWidth(indentToPrint, w - currentVisualCol);
-                    indentVisualLen = TuiUtils::countUtf8CodePoints(indentToPrint); // Re-evaluate
+                if (currentVisualCol + indentActualVisualLen > static_cast<size_t>(w)) {
+                    indentToPrint = TuiUtils::trimToUtf8VisualWidth(indentToPrint, w - currentVisualCol); // MODIFIED
+                    indentActualVisualLen = TuiUtils::calculateUtf8VisualWidth(indentToPrint); // Re-evaluate // MODIFIED
                 }
-                if (indentVisualLen > 0) {
+                if (indentActualVisualLen > 0) {
                     Terminal::setForegroundRGB(pItem.indentColor.r, pItem.indentColor.g, pItem.indentColor.b);
                     std::cout << indentToPrint;
-                    currentVisualCol += indentVisualLen;
+                    currentVisualCol += indentActualVisualLen;
                 }
             }
             
@@ -173,16 +173,16 @@ void drawTextList(int r, int c, int h, int w,
                     Terminal::setForegroundRGB(pItem.iconColor.r, pItem.iconColor.g, pItem.iconColor.b);
                     
                     std::string iconToPrint = pItem.iconGlyph;
-                    size_t iconVisualLen = TuiUtils::countUtf8CodePoints(iconToPrint);
+                    size_t iconActualVisualLen = TuiUtils::calculateUtf8VisualWidth(iconToPrint); // MODIFIED
                     bool iconPrinted = false;
 
-                    if (currentVisualCol + iconVisualLen > static_cast<size_t>(w)) {
-                        iconToPrint = TuiUtils::trimToVisualWidth(iconToPrint, w - currentVisualCol);
-                        iconVisualLen = TuiUtils::countUtf8CodePoints(iconToPrint); 
+                    if (currentVisualCol + iconActualVisualLen > static_cast<size_t>(w)) {
+                        iconToPrint = TuiUtils::trimToUtf8VisualWidth(iconToPrint, w - currentVisualCol); // MODIFIED
+                        iconActualVisualLen = TuiUtils::calculateUtf8VisualWidth(iconToPrint);  // MODIFIED
                     }
-                    if (iconVisualLen > 0) {
+                    if (iconActualVisualLen > 0) {
                         std::cout << iconToPrint;
-                        currentVisualCol += iconVisualLen;
+                        currentVisualCol += iconActualVisualLen;
                         iconPrinted = true;
                     }
                     
@@ -199,14 +199,18 @@ void drawTextList(int r, int c, int h, int w,
             if (currentVisualCol < static_cast<size_t>(w)) {
                 Terminal::setForeground(currentItemFgColor);
                 std::string textToPrint = pItem.textWithoutIcon;
-                size_t textVisualLen = TuiUtils::countUtf8CodePoints(textToPrint);
+                
+                if (currentVisualCol < static_cast<size_t>(w)) { // Ensure there's space left before trying to print text
+                    size_t availableTextWidth = w - currentVisualCol;
+                    size_t textActualVisualLen = TuiUtils::calculateUtf8VisualWidth(textToPrint); // MODIFIED
 
-                if (currentVisualCol + textVisualLen > static_cast<size_t>(w)) {
-                    textToPrint = TuiUtils::trimToVisualWidth(textToPrint, w - currentVisualCol);
-                    // textVisualLen = TuiUtils::countUtf8CodePoints(textToPrint); // Not strictly needed after trim for this segment
+                    if (textActualVisualLen > availableTextWidth) {
+                        textToPrint = TuiUtils::trimToUtf8VisualWidth(textToPrint, availableTextWidth); // MODIFIED
+                        textActualVisualLen = TuiUtils::calculateUtf8VisualWidth(textToPrint); // Re-evaluate actual printed width // MODIFIED
+                    }
+                    std::cout << textToPrint;
+                    currentVisualCol += textActualVisualLen; // Use actual printed visual width
                 }
-                std::cout << textToPrint;
-                currentVisualCol += TuiUtils::countUtf8CodePoints(textToPrint); // Use actual printed length
             }
 
 
@@ -320,6 +324,143 @@ std::string trimToVisualWidth(const std::string& s, size_t visualWidth) {
         
         result.append(s, i, char_len);
         current_visual_width++;
+        i += char_len;
+    }
+    return result;
+}
+
+// 新增：实现计算UTF-8字符串实际视觉宽度的函数
+size_t calculateUtf8VisualWidth(const std::string& s) {
+    size_t visual_width = 0;
+    for (size_t i = 0; i < s.length(); ) {
+        unsigned char byte = static_cast<unsigned char>(s[i]);
+        size_t char_len = 1;
+        size_t char_visual_width = 1;
+        uint32_t codepoint = 0; // 用于存储解码后的码点
+
+        if (byte < 0x80) { // ASCII (0xxxxxxx)
+            codepoint = byte;
+            // char_len = 1, char_visual_width = 1 (already set)
+        } else if ((byte & 0xE0) == 0xC0) { // 2-byte sequence (110xxxxx 10xxxxxx)
+            char_len = 2;
+            if (i + 1 < s.length() && (static_cast<unsigned char>(s[i+1]) & 0xC0) == 0x80) {
+                codepoint = ((byte & 0x1F) << 6) | (static_cast<unsigned char>(s[i+1]) & 0x3F);
+                char_visual_width = 2; 
+            } else { // Malformed
+                char_len = 1; char_visual_width = 1; codepoint = byte;
+            }
+        } else if ((byte & 0xF0) == 0xE0) { // 3-byte sequence (1110xxxx 10xxxxxx 10xxxxxx)
+            char_len = 3;
+            if (i + 2 < s.length() && (static_cast<unsigned char>(s[i+1]) & 0xC0) == 0x80 && (static_cast<unsigned char>(s[i+2]) & 0xC0) == 0x80) {
+                codepoint = ((byte & 0x0F) << 12) | ((static_cast<unsigned char>(s[i+1]) & 0x3F) << 6) | (static_cast<unsigned char>(s[i+2]) & 0x3F);
+                if (codepoint >= 0x2500 && codepoint <= 0x257F) { // Box Drawing characters
+                    char_visual_width = 1;
+                } else {
+                    char_visual_width = 2; // Default for 3-byte (e.g., CJK)
+                }
+            } else { // Malformed
+                char_len = 1; char_visual_width = 1; codepoint = byte;
+            }
+        } else if ((byte & 0xF8) == 0xF0) { // 4-byte sequence (11110xxx 10xxxxxx 10xxxxxx 10xxxxxx)
+            char_len = 4;
+            if (i + 3 < s.length() && (static_cast<unsigned char>(s[i+1]) & 0xC0) == 0x80 && (static_cast<unsigned char>(s[i+2]) & 0xC0) == 0x80 && (static_cast<unsigned char>(s[i+3]) & 0xC0) == 0x80) {
+                codepoint = ((byte & 0x07) << 18) | ((static_cast<unsigned char>(s[i+1]) & 0x3F) << 12) | ((static_cast<unsigned char>(s[i+2]) & 0x3F) << 6) | (static_cast<unsigned char>(s[i+3]) & 0x3F);
+                char_visual_width = 2; 
+            } else { // Malformed
+                char_len = 1; char_visual_width = 1; codepoint = byte;
+            }
+        } else {
+            // Invalid UTF-8 start byte or isolated continuation byte.
+            char_len = 1; char_visual_width = 1; codepoint = byte;
+        }
+
+        // --- 新增：Nerd Font PUA 区域特判 ---
+        // BMP PUA: U+E000 ~ U+F8FF
+        // SMP PUA: U+F0000 ~ U+FFFFD
+        // SIP PUA: U+100000 ~ U+10FFFD
+        if (
+            (codepoint >= 0xE000 && codepoint <= 0xF8FF) ||
+            (codepoint >= 0xF0000 && codepoint <= 0xFFFFD) ||
+            (codepoint >= 0x100000 && codepoint <= 0x10FFFD)
+        ) {
+            char_visual_width = 1;
+        }
+        // --- end 新增 ---
+
+        // Boundary check: ensure the full character sequence is within the string
+        if (i + char_len > s.length()) {
+            visual_width += (s.length() - i);
+            break; 
+        }
+        
+        visual_width += char_visual_width;
+        i += char_len;
+    }
+    return visual_width;
+}
+
+// 新增：实现按实际视觉宽度截断UTF-8字符串的函数
+std::string trimToUtf8VisualWidth(const std::string& s, size_t targetVisualWidth) {
+    if (targetVisualWidth == 0) return "";
+
+    std::string result;
+    result.reserve(s.length()); // Pre-allocate for efficiency
+    size_t current_visual_width = 0;
+    
+    for (size_t i = 0; i < s.length(); ) {
+        unsigned char byte = static_cast<unsigned char>(s[i]);
+        size_t char_len = 1;
+        size_t char_visual_width = 1;
+        uint32_t codepoint = 0; // 用于存储解码后的码点
+
+        if (byte < 0x80) { // ASCII
+            codepoint = byte;
+            // char_len = 1, char_visual_width = 1
+        } else if ((byte & 0xE0) == 0xC0) { // 2-byte
+            char_len = 2;
+            if (i + 1 < s.length() && (static_cast<unsigned char>(s[i+1]) & 0xC0) == 0x80) {
+                codepoint = ((byte & 0x1F) << 6) | (static_cast<unsigned char>(s[i+1]) & 0x3F);
+                char_visual_width = 2;
+            } else { // Malformed
+                char_len = 1; char_visual_width = 1; codepoint = byte;
+            }
+        } else if ((byte & 0xF0) == 0xE0) { // 3-byte
+            char_len = 3;
+            if (i + 2 < s.length() && (static_cast<unsigned char>(s[i+1]) & 0xC0) == 0x80 && (static_cast<unsigned char>(s[i+2]) & 0xC0) == 0x80) {
+                codepoint = ((byte & 0x0F) << 12) | ((static_cast<unsigned char>(s[i+1]) & 0x3F) << 6) | (static_cast<unsigned char>(s[i+2]) & 0x3F);
+                if (codepoint >= 0x2500 && codepoint <= 0x257F) { // Box Drawing characters
+                    char_visual_width = 1;
+                } else {
+                    char_visual_width = 2;
+                }
+            } else { // Malformed
+                char_len = 1; char_visual_width = 1; codepoint = byte;
+            }
+        } else if ((byte & 0xF8) == 0xF0) { // 4-byte
+            char_len = 4;
+            if (i + 3 < s.length() && (static_cast<unsigned char>(s[i+1]) & 0xC0) == 0x80 && (static_cast<unsigned char>(s[i+2]) & 0xC0) == 0x80 && (static_cast<unsigned char>(s[i+3]) & 0xC0) == 0x80) {
+                codepoint = ((byte & 0x07) << 18) | ((static_cast<unsigned char>(s[i+1]) & 0x3F) << 12) | ((static_cast<unsigned char>(s[i+2]) & 0x3F) << 6) | (static_cast<unsigned char>(s[i+3]) & 0x3F);
+                char_visual_width = 2;
+            } else { // Malformed
+                char_len = 1; char_visual_width = 1; codepoint = byte;
+            }
+        } else {
+            // Invalid start byte, treat as 1-byte, 1-width char
+            // char_len = 1, char_visual_width = 1
+            codepoint = byte;
+        }
+
+        if (i + char_len > s.length()) { // Incomplete char at the end of the string
+            break; 
+        }
+        
+        // Check if adding this character would exceed the target visual width
+        if (current_visual_width + char_visual_width > targetVisualWidth) {
+            break; 
+        }
+        
+        result.append(s, i, char_len);
+        current_visual_width += char_visual_width;
         i += char_len;
     }
     return result;

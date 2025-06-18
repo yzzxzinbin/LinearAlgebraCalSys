@@ -48,4 +48,10 @@ size_t countUtf8CodePoints(const std::string& s);
 // 新增：按视觉宽度截断字符串
 std::string trimToVisualWidth(const std::string& s, size_t visualWidth);
 
+// 新增：计算UTF-8字符串的实际视觉宽度（例如，中文字符计为2）
+size_t calculateUtf8VisualWidth(const std::string& s);
+
+// 新增：按实际视觉宽度截断UTF-8字符串
+std::string trimToUtf8VisualWidth(const std::string& s, size_t targetVisualWidth);
+
 } // namespace TuiUtils

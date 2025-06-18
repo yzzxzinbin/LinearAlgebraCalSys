@@ -568,16 +568,20 @@ void StartupScreen::drawWideLayout(int termRows, int termCols)
     int dirWidth = termCols / 4;
     if (dirWidth < 20)
         dirWidth = std::min(termCols / 2, 20);
-    dirWidth = std::min(dirWidth, termCols - 40);
-    dirWidth = std::max(15, dirWidth);
+    dirWidth = std::min(dirWidth, termCols - 40); // Ensure banner has some space
+    dirWidth = std::max(15, dirWidth); // Minimum width for the directory panel
 
     int bannerPanelWidth = termCols - dirWidth;
     int contentHeight = termRows;
 
+    // Box is drawn from (0,0) with width dirWidth.
+    // Borders take 1 col on left and 1 col on right.
+    // Inner content area is from col 1 to dirWidth-2.
+    // So, inner width is (dirWidth-2) - 1 + 1 = dirWidth-2.
     TuiUtils::drawBox(0, 0, contentHeight, dirWidth, " SELECT WORKENV ", Color::WHITE, Color::DEFAULT);
     int listR = 1, listC = 1;
-    int listH = std::max(0, contentHeight - 2);
-    int listW = std::max(0, dirWidth - 3);
+    int listH = std::max(0, contentHeight - 2); // -2 for top/bottom box borders
+    int listW = std::max(0, dirWidth - 2);      // Corrected: -2 for left/right box borders
 
     if (listH > 0 && listW > 0)
     {
@@ -662,10 +666,12 @@ void StartupScreen::drawTallLayout(int termRows, int termCols)
     int bannerPanelHeight = termRows - dirHeight;
     int contentWidth = termCols;
 
+    // Box is drawn from (0,0) with width contentWidth.
+    // Inner width is contentWidth - 2.
     TuiUtils::drawBox(0, 0, dirHeight, contentWidth, " SELECT WORKENV ", Color::WHITE, Color::DEFAULT);
     int listR = 1, listC = 1;
-    int listH = std::max(0, dirHeight - 2);
-    int listW = std::max(0, contentWidth - 2);
+    int listH = std::max(0, dirHeight - 2);    // -2 for top/bottom box borders
+    int listW = std::max(0, contentWidth - 2); // -2 for left/right box borders (this was already correct)
 
     if (listH > 0 && listW > 0)
     {
