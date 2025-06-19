@@ -410,3 +410,9 @@ void EnhancedVariableViewer::drawEquationSolutionPreview(const EquationSolution&
 std::string EnhancedVariableViewer::getStatusMessage() const {
     return statusMessage;
 }
+
+void EnhancedVariableViewer::updateDimensions(int termRows, int termCols) {
+    this->terminalRows = termRows;
+    this->terminalCols = termCols;
+    updateLayout();
+}

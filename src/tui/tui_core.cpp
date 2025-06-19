@@ -1,5 +1,6 @@
 #include "tui_app.h"
 #include "tui_terminal.h"
+#include "../utils/tui_utils.h" // 新增：包含TUI工具函数
 #include <iostream>
 #include <string>
 #include <algorithm> // For std::string::resize in drawStatusBar
@@ -11,13 +12,31 @@ void TuiApp::drawHeader()
     Terminal::setForeground(Color::CYAN);
     Terminal::setBackground(Color::BLUE);
 
-    std::string title = " 线性代数计算系统 v1.1 ";
-    int padding = (terminalCols - title.length()) / 2;
+    std::string title = "线性代数计算系统 v1.1";
+    
+    // 使用UTF-8视觉宽度计算来正确处理中文字符
+    size_t titleVisualWidth = TuiUtils::calculateUtf8VisualWidth(title);
+    int padding = (terminalCols - static_cast<int>(titleVisualWidth)) / 2;
+    if (padding < 0) padding = 0; // 防止负数
 
-    std::string header(terminalCols, ' ');
-    for (size_t i = 0; i < title.length(); i++)
-    {
-        header[padding + i] = title[i];
+    // 构建完整的header行
+    std::string header;
+    header.reserve(terminalCols * 3); // 预留足够空间处理UTF-8字符
+    
+    // 添加左侧填充
+    header.append(padding, ' ');
+    
+    // 添加标题（如果放得下的话）
+    if (padding + static_cast<int>(titleVisualWidth) <= terminalCols) {
+        header += title;
+    }
+    
+    // 计算已使用的视觉宽度
+    size_t usedVisualWidth = TuiUtils::calculateUtf8VisualWidth(header);
+    
+    // 添加右侧填充以确保占满整行
+    if (usedVisualWidth < static_cast<size_t>(terminalCols)) {
+        header.append(terminalCols - usedVisualWidth, ' ');
     }
 
     std::cout << header;
@@ -33,7 +52,15 @@ void TuiApp::drawStatusBar()
 
     // 状态栏信息
     std::string status = " " + statusMessage;
-    status.resize(terminalCols, ' ');
+
+    // 使用UTF-8视觉宽度计算来正确处理中文字符
+    size_t statusVisualWidth = TuiUtils::calculateUtf8VisualWidth(status);
+
+    // 添加右侧填充以确保占满整行
+    if (statusVisualWidth < static_cast<size_t>(terminalCols))
+    {
+        status.append(terminalCols - statusVisualWidth, ' ');
+    }
 
     std::cout << status;
     Terminal::resetColor();
@@ -63,6 +90,16 @@ void TuiApp::updateUI()
         inputRow = terminalRows - 2;
         // 如果终端大小改变，可能需要重新创建或更新 suggestionBox 的宽度
         suggestionBox = std::make_unique<SuggestionBox>(terminalCols);
+
+        // 新增：如果编辑器或预览器处于活动状态，则更新其尺寸
+        if (matrixEditor) {
+            matrixEditor->updateDimensions(terminalRows, terminalCols);
+        }
+        if (variableViewer) {
+            // 假设 variableViewer 也有 updateDimensions 方法
+            variableViewer->updateDimensions(terminalRows, terminalCols);
+        }
+        
         initUI();
     }
 
@@ -102,13 +139,13 @@ void TuiApp::run()
         // 更新UI
         if (matrixEditor)
         { // 如果增强型编辑器激活
+            updateUI(); // 确保编辑器绘制前更新UI
             matrixEditor->draw();
-            updateUI(); // 确保编辑器绘制后更新UI
             // 状态栏由编辑器或TuiApp更新
-            // drawStatusBar(); // 确保状态栏在编辑器绘制后更新，如果编辑器不自己画的话
         }
         else if (variableViewer)
         { // 如果变量预览器激活
+            updateUI(); // 确保预览器绘制前更新UI
             variableViewer->draw();
             // 状态栏由预览器或TuiApp更新
         }
@@ -116,6 +153,7 @@ void TuiApp::run()
         {
             updateUI(); // updateUI 会调用 drawInputPrompt, drawInputPrompt 会调用 suggestionBox->draw
         }
+        
         drawStatusBar(); // 总是绘制状态栏，确保它在最下面且最新
 
         // 确保UI更新立即显示

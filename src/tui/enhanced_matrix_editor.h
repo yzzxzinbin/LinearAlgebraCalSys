@@ -69,6 +69,7 @@ public:
 
     EditorResult handleInput(int key);
     void draw(bool fullRedraw = false);
+    void updateDimensions(int termRows, int termCols);
     
     Variable getEditedVariableCopy() const; // 返回编辑后的变量副本
     const std::string& getVariableName() const;

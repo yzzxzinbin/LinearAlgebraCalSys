@@ -66,4 +66,5 @@ public:
     void draw();
     std::string getStatusMessage() const;
     void refreshVariableList(); // 刷新变量列表
+    void updateDimensions(int termRows, int termCols);
 };

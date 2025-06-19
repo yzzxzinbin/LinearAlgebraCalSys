@@ -429,6 +429,7 @@ std::string StartupScreen::run()
 {
     Terminal::setRawMode(true);
     Terminal::clear();
+    std::cout << std::flush;
 
     std::string selectedPath = ""; // Changed from selectedFileName for clarity
 

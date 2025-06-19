@@ -23,6 +23,11 @@ EnhancedMatrixEditor::~EnhancedMatrixEditor() {
     std::iostream::sync_with_stdio(true); // 恢复同步
 }
 
+void EnhancedMatrixEditor::updateDimensions(int termRows, int termCols) {
+    terminalRows = termRows;
+    terminalCols = termCols;
+}
+
 void EnhancedMatrixEditor::updateStatus(const std::string& msg) {
     statusMessage = msg;
 }
