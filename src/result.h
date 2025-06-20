@@ -11,7 +11,8 @@ public:
     enum class Type {
         SCALAR,  // 标量（单个数值）
         VECTOR,  // 向量
-        MATRIX   // 矩阵
+        MATRIX,  // 矩阵
+        STRING   // 新增：字符串类型
     };
 
 private:
@@ -20,6 +21,7 @@ private:
     std::vector<std::string> vectorValues_;     // 向量值
     std::vector<std::vector<std::string>> matrixValues_; // 矩阵值
     size_t rows_, cols_;                         // 矩阵维度
+    std::string stringValue_;                    // 新增：字符串值
 
 public:
     // 构造函数
@@ -27,6 +29,10 @@ public:
     Result(const std::string& scalar);  // 标量构造
     Result(const std::vector<std::string>& vector);  // 向量构造
     Result(const std::vector<std::vector<std::string>>& matrix);  // 矩阵构造
+    Result(Type type, const std::string& str); // 新增：字符串类型构造
+
+    // 新增：字符串类型专用构造
+    static Result fromString(const std::string& str);
 
     // 获取类型
     Type getType() const;
@@ -35,6 +41,7 @@ public:
     const std::string& getScalar() const;
     const std::vector<std::string>& getVector() const;
     const std::vector<std::vector<std::string>>& getMatrix() const;
+    const std::string& getString() const; // 新增
 
     // 获取维度信息
     size_t getRows() const;
@@ -44,7 +51,7 @@ public:
     // 显示方法
     void print(std::ostream& os = std::cout) const;
 
-    // 序列化方法（用于导出）
+    // 纯字符串序列化方法（支持转义，适合保存/导出）
     std::string serialize() const;
     static Result deserialize(const std::string& data);
 

@@ -24,7 +24,9 @@ file(GLOB_RECURSE APP_SOURCES
     "src/vector.cpp"
     "src/result.cpp"
     "src/similar_matrix_operations.cpp"
+    "src/vectorset_operation.cpp"
     "src/equationset.cpp" # 添加新文件
+
 
     "src/main.cpp"
     

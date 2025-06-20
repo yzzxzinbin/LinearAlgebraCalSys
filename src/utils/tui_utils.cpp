@@ -261,7 +261,7 @@ void drawTextLines(int r, int c, int h, int w, const std::vector<std::string>& l
     Terminal::resetColor();
 }
 
-// 修改：改进 countUtf8CodePoints 的健壮性
+//countUtf8CodePoints 非通用性宽度计算函数 专用于启动bannar输出控制
 size_t countUtf8CodePoints(const std::string& s) {
     size_t count = 0;
     for (size_t i = 0; i < s.length(); ) {
@@ -291,7 +291,7 @@ size_t countUtf8CodePoints(const std::string& s) {
     return count;
 }
 
-// 新增：实现按视觉宽度截断字符串的函数
+// 基于 countUtf8CodePoints 实现按视觉宽度截断字符串的函数
 std::string trimToVisualWidth(const std::string& s, size_t visualWidth) {
     if (visualWidth == 0) return "";
 
@@ -329,7 +329,7 @@ std::string trimToVisualWidth(const std::string& s, size_t visualWidth) {
     return result;
 }
 
-// 新增：实现计算UTF-8字符串实际视觉宽度的函数
+// 计算UTF-8字符串实际视觉宽度的通用函数方案 兼容PUA字符
 size_t calculateUtf8VisualWidth(const std::string& s) {
     size_t visual_width = 0;
     for (size_t i = 0; i < s.length(); ) {
@@ -383,6 +383,13 @@ size_t calculateUtf8VisualWidth(const std::string& s) {
             (codepoint >= 0xF0000 && codepoint <= 0xFFFFD) ||
             (codepoint >= 0x100000 && codepoint <= 0x10FFFD)
         ) {
+            char_visual_width = 1;
+        }
+
+        // --- 新增:希腊字母长度修正 ---
+        if (codepoint >= 0x0391 && codepoint <= 0x03A1) { // 希腊大写字母
+            char_visual_width = 1;
+        } else if (codepoint >= 0x03B1 && codepoint <= 0x03C1) { // 希腊小写字母
             char_visual_width = 1;
         }
         // --- end 新增 ---
