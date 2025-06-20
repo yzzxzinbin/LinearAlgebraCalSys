@@ -1,5 +1,16 @@
 #include "vector.h"
 #include <iomanip>
+#include <boost/multiprecision/cpp_int.hpp>
+#include <boost/multiprecision/cpp_dec_float.hpp>
+
+namespace { // anonymous namespace to limit scope to this file
+    bool is_perfect_square(const BigInt& n) {
+        if (n < 0) return false;
+        if (n == 0) return true;
+        BigInt root = boost::multiprecision::sqrt(n);
+        return root * root == n;
+    }
+}
 
 Vector::Vector(size_t n) : data(n) {}
 Vector::Vector(const std::vector<Fraction>& d) : data(d) {}
@@ -85,30 +96,48 @@ Vector Vector::cross(const Vector& rhs) const {
 
 // 计算向量的模（长度/范数）
 Fraction Vector::norm() const {
-    Fraction sum;
+    Fraction sum_of_squares;
     for (const auto& value : data) {
-        sum += value * value;
+        sum_of_squares += value * value;
     }
-    
-    // 注意：由于我们使用Fraction类，这里无法直接计算平方根
-    // 对于分数来说，只有在分子、分母都是完全平方数的情况下才能准确表示
-    // 这里返回的是向量长度的平方
-    // 如果需要精确的平方根，我们需要扩展Fraction类或采用其他方法
-    return sum;
+
+    // 检查分子和分母是否为完全平方数
+    if (is_perfect_square(sum_of_squares.getNumerator()) && 
+        is_perfect_square(sum_of_squares.getDenominator())) {
+        // 返回精确平方根
+        return Fraction(
+            boost::multiprecision::sqrt(sum_of_squares.getNumerator()),
+            boost::multiprecision::sqrt(sum_of_squares.getDenominator())
+        );
+    } else {
+        // 高精度浮点数近似
+        using HighPrecisionFloat = boost::multiprecision::cpp_dec_float_100;
+        HighPrecisionFloat num_hp(sum_of_squares.getNumerator().str());
+        HighPrecisionFloat den_hp(sum_of_squares.getDenominator().str());
+        HighPrecisionFloat val_hp = num_hp / den_hp;
+        HighPrecisionFloat sqrt_val_hp = boost::multiprecision::sqrt(val_hp);
+
+        // 将 scale 转换为 HighPrecisionFloat 后再乘法
+        BigInt scale = boost::multiprecision::pow(BigInt(10), 20);
+        HighPrecisionFloat scaled_val = sqrt_val_hp * HighPrecisionFloat(scale);
+        
+        // 四舍五入并转换回 BigInt
+        BigInt approx_num = static_cast<BigInt>(round(scaled_val));
+        return Fraction(approx_num, scale);
+    }
 }
 
 // 向量归一化
 Vector Vector::normalize() const {
-    Fraction length_squared = norm();
-    if (length_squared == Fraction(0)) {
+    Fraction length = this->norm();
+    if (length == Fraction(0)) {
         throw std::runtime_error("Cannot normalize a zero vector.");
     }
     
-    // 由于无法直接计算分数的平方根，这里我们返回的是向量除以其长度的平方
-    // 如果需要真正的单位向量，需要扩展Fraction类以支持平方根计算
+    // 向量中的每个分量除以向量的模长
     Vector result = *this;
     for (size_t i = 0; i < data.size(); ++i) {
-        result.data[i] = result.data[i] / length_squared;
+        result.data[i] /= length;
     }
     return result;
 }
