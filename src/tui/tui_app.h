@@ -45,6 +45,9 @@ private:
     // 程序状态
     bool running;
     std::string statusMessage;
+
+    // 新增：是否退出时不自动保存
+    bool noSavingOnExit = false;
     
     // 解释器
     Interpreter interpreter;
@@ -117,4 +120,7 @@ public:
 
     // 新增：退出时导出变量和历史
     void exportVariablesOnExit(const std::string& filename);
+
+    // 新增：获取 noSavingOnExit 状态
+    bool getNoSavingOnExit() const { return noSavingOnExit; }
 };

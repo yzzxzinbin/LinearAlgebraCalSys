@@ -478,9 +478,21 @@ void TuiApp::executeCommand(const std::string &input)
             return;
         }
 
-        // 处理exit命令
-        if (processedInput == "exit" || processedInput == "exit;")
-        {
+        // 处理exit命令（支持 --no-saving 参数）
+        if (commandStr == "exit") {
+            // 检查是否有 --no-saving 参数
+            bool foundNoSaving = false;
+            for (const auto& arg : commandArgs) {
+                if (arg == "--no-saving") {
+                    foundNoSaving = true;
+                    break;
+                }
+            }
+            if (foundNoSaving) {
+                noSavingOnExit = true;
+                printToResultView("本次退出将不会自动保存变量和历史。", Color::YELLOW);
+                statusMessage = "已设置为退出时不自动保存";
+            }
             running = false;
             return;
         }

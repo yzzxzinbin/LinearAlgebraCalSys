@@ -30,7 +30,8 @@ TuiApp::TuiApp(const std::string& initialCommand)  // 修改构造函数定义
       matrixEditor(nullptr),
       suggestionBox(nullptr), // 初始化 suggestionBox
       stepDisplayStartRow(0), // 初始化步骤显示起始行
-      initialCommandToExecute(initialCommand) // 保存初始命令
+      initialCommandToExecute(initialCommand), // 保存初始命令
+      noSavingOnExit(false) // 新增：默认允许自动保存
 {
     // 初始化终端以支持ANSI转义序列
     if (!Terminal::init())
