@@ -53,3 +53,13 @@ TuiApp::TuiApp(const std::string& initialCommand)  // 修改构造函数定义
     // 初始状态消息
     statusMessage = "欢迎使用线性代数辅助计算系统! 输入 'help' 获取帮助。";
 }
+
+void TuiApp::exportVariablesOnExit(const std::string& filename) {
+    // 注意：此函数应线程安全且可重入
+    try {
+        interpreter.exportVariables(filename, history);
+        LOG_INFO("已自动保存变量和历史到工作环境文件: " + filename);
+    } catch (const std::exception& e) {
+        LOG_ERROR("自动保存变量和历史失败: " + std::string(e.what()));
+    }
+}

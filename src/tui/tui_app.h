@@ -114,4 +114,7 @@ public:
     // 新增：已知函数和命令列表 (在 .cpp 文件中定义)
     static const std::vector<std::string> KNOWN_FUNCTIONS;
     static const std::vector<std::string> KNOWN_COMMANDS;
+
+    // 新增：退出时导出变量和历史
+    void exportVariablesOnExit(const std::string& filename);
 };

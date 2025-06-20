@@ -10,6 +10,36 @@
 #include <windows.h>
 #endif
 
+// 新增：全局变量保存工作文件路径和TuiApp指针
+#include <atomic>
+#include <mutex>
+std::string g_work_env_file_path;
+TuiApp* g_app_ptr = nullptr;
+std::mutex g_export_mutex;
+
+// 新增：退出事件处理函数
+#ifdef _WIN32
+BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
+    if (!g_work_env_file_path.empty() && g_app_ptr) {
+        std::lock_guard<std::mutex> lock(g_export_mutex);
+        g_app_ptr->exportVariablesOnExit(g_work_env_file_path);
+    }
+    return FALSE; // 允许系统继续处理
+}
+#else
+#include <signal.h>
+#include <unistd.h>
+void signal_handler(int signo) {
+    if (!g_work_env_file_path.empty() && g_app_ptr) {
+        std::lock_guard<std::mutex> lock(g_export_mutex);
+        g_app_ptr->exportVariablesOnExit(g_work_env_file_path);
+    }
+    // 还原默认处理并重新发送信号以终止进程
+    signal(signo, SIG_DFL);
+    raise(signo);
+}
+#endif
+
 int main()
 {
     std::string initialCommandToRun = "";
@@ -51,15 +81,32 @@ int main()
             // 准备 import 命令。文件名应为简单标识符。
             std::string importCommand = "import \""; // 在文件名前添加 "import \""
             importCommand += selectedFile;      // 添加文件名
-            importCommand += "\"";               // 在文件名后添加 "
+            importCommand += "\"";               // 在文件名后添加 "             
             initialCommandToRun = importCommand;
+            g_work_env_file_path = selectedFile; // 记录工作环境文件路径
         } else {
             LOG_INFO("启动界面未选择文件或已退出 (ESC 或选择了 NULL 选项)");
+            g_work_env_file_path.clear();
         }
+
+        // 注册退出监听器(用于导出变量和历史)
+#ifdef _WIN32
+        SetConsoleCtrlHandler(CtrlHandler, TRUE);
+#else
+        struct sigaction act;
+        act.sa_handler = signal_handler;
+        sigemptyset(&act.sa_mask);
+        act.sa_flags = 0;
+        sigaction(SIGINT, &act, NULL);
+        sigaction(SIGTERM, &act, NULL);
+        sigaction(SIGQUIT, &act, NULL);
+        sigaction(SIGHUP, &act, NULL);
+#endif
 
         // 创建并运行TUI应用程序
         LOG_INFO("创建TUI应用程序实例");
         TuiApp app(initialCommandToRun); // 将初始命令传递给TuiApp
+        g_app_ptr = &app; // 记录指针以便退出时访问
         LOG_INFO("开始运行TUI应用程序主循环");
         app.run();
 

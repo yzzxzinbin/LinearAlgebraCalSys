@@ -284,7 +284,7 @@ void TuiApp::executeCommand(const std::string &input)
                 filename = filename.substr(1, filename.length() - 2);
             }
             
-            std::string export_message = interpreter.exportVariables(filename, history); // 传递历史记录
+            std::string export_message = interpreter.exportVariables(filename, history); // 导出数据
             printToResultView(export_message, Color::YELLOW);
             statusMessage = export_message;
             return;
