@@ -392,6 +392,17 @@ size_t calculateUtf8VisualWidth(const std::string& s) {
         } else if (codepoint >= 0x03B1 && codepoint <= 0x03C1) { // 希腊小写字母
             char_visual_width = 1;
         }
+
+        // --- 新增:拉丁及拉丁扩展块长度修正 ---
+        if (codepoint >= 0x0041 && codepoint <= 0x005A) { // 拉丁大写字母
+            char_visual_width = 1;
+        } else if (codepoint >= 0x0061 && codepoint <= 0x007A) { // 拉丁小写字母
+            char_visual_width = 1;
+        } else if (codepoint >= 0x0080 && codepoint <= 0x00FF) { // 拉丁-1补充
+            char_visual_width = 1;
+        } else if (codepoint >= 0x0100 && codepoint <= 0x02AF) { // 扩展
+            char_visual_width = 1;
+        }
         // --- end 新增 ---
 
         // Boundary check: ensure the full character sequence is within the string

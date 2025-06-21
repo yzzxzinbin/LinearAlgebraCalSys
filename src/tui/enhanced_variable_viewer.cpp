@@ -42,11 +42,11 @@ void EnhancedVariableViewer::refreshVariableList() {
 }
 
 void EnhancedVariableViewer::updateLayout() {
-    // 列表占左侧约1/3，预览窗口占右侧约2/3
+    // 列表占左侧约1/4，预览窗口占右侧约3/4
     listStartRow = 2;
     listStartCol = 1;
     listHeight = terminalRows - 4; // 留出标题和状态栏空间
-    listWidth = std::max(20, terminalCols / 3);
+    listWidth = std::max(20, terminalCols / 4);
     
     previewStartRow = 2;
     previewStartCol = listStartCol + listWidth + 2; // 留2列间距
@@ -176,13 +176,13 @@ void EnhancedVariableViewer::drawVariableList() {
         Terminal::resetColor();
         return;
     }
-    
+
     for (int i = 0; i < listHeight && (scrollOffset + i) < variableList.size(); i++) {
         size_t itemIndex = scrollOffset + i;
         const auto& item = variableList[itemIndex];
-        
+
         Terminal::setCursor(listStartRow + i, listStartCol);
-        
+
         bool isSelected = (itemIndex == currentSelection);
         if (isSelected) {
             Terminal::setBackground(Color::CYAN);
@@ -190,18 +190,53 @@ void EnhancedVariableViewer::drawVariableList() {
         } else {
             Terminal::setForeground(Color::WHITE);
         }
-        
-        std::string line = item.name + " (" + item.typeString;
+
+        // 构建变量名部分
+        std::string namePart = item.name;
+
+        // 构建类型部分（参数在前，类型在后，如 "4维 向量" 或 "4x4 矩阵"）
+        std::string typePart;
         if (!item.sizeInfo.empty()) {
-            line += " " + item.sizeInfo;
+            typePart = item.sizeInfo + " " + item.typeString;
+        } else {
+            typePart = item.typeString;
         }
-        line += ")";
-        
-        if (line.length() > listWidth - 2) {
-            line = line.substr(0, listWidth - 5) + "...";
+
+        // 使用视觉宽度计算
+        size_t nameWidth = TuiUtils::calculateUtf8VisualWidth(namePart);
+        size_t typeWidth = TuiUtils::calculateUtf8VisualWidth(typePart);
+        int totalWidth = listWidth - 2; // 两侧各留1空格
+
+        int remainingWidth = static_cast<int>(totalWidth) - static_cast<int>(nameWidth) - static_cast<int>(typeWidth);
+        if (remainingWidth < 2) remainingWidth = 2; // 至少留2个空格分隔
+
+        // 组合最终行 (变量名 + 空格 + 右对齐类型)
+        std::string line = namePart + std::string(remainingWidth, ' ') + typePart;
+
+        // 超长处理: 优先截断变量名
+        while (TuiUtils::calculateUtf8VisualWidth(line) > static_cast<size_t>(totalWidth)) {
+            if (namePart.length() > 1) {
+                namePart = namePart.substr(0, namePart.length() - 1);
+                if (namePart.length() > 3)
+                    namePart.replace(namePart.length() - 3, 3, "...");
+            } else {
+                break;
+            }
+            nameWidth = TuiUtils::calculateUtf8VisualWidth(namePart);
+            remainingWidth = static_cast<int>(totalWidth) - static_cast<int>(nameWidth) - static_cast<int>(typeWidth);
+            if (remainingWidth < 2) remainingWidth = 2;
+            line = namePart + std::string(remainingWidth, ' ') + typePart;
         }
-        line.resize(listWidth - 2, ' ');
-        
+
+        // 补齐到总宽度
+        size_t lineVisualWidth = TuiUtils::calculateUtf8VisualWidth(line);
+        if (lineVisualWidth < static_cast<size_t>(totalWidth)) {
+            line += std::string(totalWidth - lineVisualWidth, ' ');
+        } else if (lineVisualWidth > static_cast<size_t>(totalWidth)) {
+            // 再次截断，防止极端情况
+            line = TuiUtils::trimToUtf8VisualWidth(line, totalWidth);
+        }
+
         std::cout << " " << line << " ";
         Terminal::resetColor();
     }
@@ -370,9 +405,9 @@ void EnhancedVariableViewer::drawResultPreview(const Result& result) {
     while (std::getline(result_iss, result_line) && currentRow < previewStartRow + previewHeight - 1) {
         Terminal::setCursor(currentRow, previewStartCol);
         Terminal::setForeground(Color::WHITE);
-        
-        if (result_line.length() > previewWidth - 2) {
-            result_line = result_line.substr(0, previewWidth - 5) + "...";
+        // 使用视觉宽度截断
+        if (TuiUtils::calculateUtf8VisualWidth(result_line) > static_cast<size_t>(previewWidth - 2)) {
+            result_line = TuiUtils::trimToUtf8VisualWidth(result_line, previewWidth - 5) + "...";
         }
         std::cout << result_line;
         currentRow++;
@@ -397,9 +432,9 @@ void EnhancedVariableViewer::drawEquationSolutionPreview(const EquationSolution&
     while (std::getline(sol_iss, sol_line) && currentRow < previewStartRow + previewHeight - 1) {
         Terminal::setCursor(currentRow, previewStartCol);
         Terminal::setForeground(Color::WHITE);
-        
-        if (sol_line.length() > previewWidth - 2) {
-            sol_line = sol_line.substr(0, previewWidth - 5) + "...";
+        // 使用视觉宽度截断
+        if (TuiUtils::calculateUtf8VisualWidth(sol_line) > static_cast<size_t>(previewWidth - 2)) {
+            sol_line = TuiUtils::trimToUtf8VisualWidth(sol_line, previewWidth - 5) + "...";
         }
         std::cout << sol_line;
         currentRow++;

@@ -784,6 +784,8 @@ void TuiApp::showHelp()
     statusMessage = "已显示帮助信息";
 }
 
+// 说明:这是变量预览器编写前用于展示变量的函数
+//      现在已经弃用大部分内容,只用作-l参数时显示变量列表
 void TuiApp::showVariables(bool listOnly)
 {
     if (matrixEditor) return; // 不在编辑器模式下显示变量
