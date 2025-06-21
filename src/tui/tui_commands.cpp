@@ -776,6 +776,12 @@ void TuiApp::showHelp()
     resultRow++;
     Terminal::setCursor(resultRow, 0);
     std::cout << "  sov = solveq(m1, v1)      - 求解方程组 Ax = b (v1可选)\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
+    std::cout << "  m2 = union_rref(m1, m2)   - 向量组联合化行最简形\n";
+    resultRow++;
+    Terminal::setCursor(resultRow, 0);
+    std::cout << "  RS1 = rep_vecset(m1, m2)   - 计算向量组的线性表示\n";
     // resultRow++; // 最后一行不需要再递增，除非后面还有输出
     std::cout << "\n"; // 确保最后有换行
     Terminal::resetColor();

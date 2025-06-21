@@ -368,6 +368,24 @@ Variable Interpreter::executeFunctionCall(const FunctionCallNode* node) {
             for (size_t i = 0; i < args[1].vectorValue.size(); ++i) m2.at(i, 0) = args[1].vectorValue.at(i);
         // 修改：返回字符串类型Result
         return Variable(Result::fromString(rep_vecset(m1, m2).getString()));
+    } else if (funcNameLower == "union_rref") { // 新增：同步rref变换
+        if (args.size() != 2)
+            throw std::runtime_error("unionrref函数需要两个参数（向量或矩阵）");
+        Matrix m1 = (args[0].type == VariableType::VECTOR) ? Matrix(args[0].vectorValue.size(), 1) : args[0].matrixValue;
+        if (args[0].type == VariableType::VECTOR)
+            for (size_t i = 0; i < args[0].vectorValue.size(); ++i) m1.at(i, 0) = args[0].vectorValue.at(i);
+        Matrix m2 = (args[1].type == VariableType::VECTOR) ? Matrix(args[1].vectorValue.size(), 1) : args[1].matrixValue;
+        if (args[1].type == VariableType::VECTOR)
+            for (size_t i = 0; i < args[1].vectorValue.size(); ++i) m2.at(i, 0) = args[1].vectorValue.at(i);
+        Matrix result = unionrref(m1, m2);
+        // 如果原始第二参数是向量，返回向量，否则返回矩阵
+        if (args[1].type == VariableType::VECTOR && result.colCount() == 1) {
+            Vector v(result.rowCount());
+            for (size_t i = 0; i < result.rowCount(); ++i) v.at(i) = result.at(i, 0);
+            return Variable(v);
+        } else {
+            return Variable(result);
+        }
     } else {
         throw std::runtime_error("未知函数: " + funcNameOriginal);
     }
