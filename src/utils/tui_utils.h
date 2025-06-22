@@ -54,4 +54,7 @@ size_t calculateUtf8VisualWidth(const std::string& s);
 // 新增：按实际视觉宽度截断UTF-8字符串
 std::string trimToUtf8VisualWidth(const std::string& s, size_t targetVisualWidth);
 
+// 新增：将多行文本按指定宽度自动换行（支持UTF-8，按视觉宽度）
+std::vector<std::string> wordWrap(const std::string& text, size_t maxWidth);
+
 } // namespace TuiUtils

@@ -71,7 +71,7 @@ void TuiApp::initUI()
     Terminal::clear();
     drawHeader();
     // 如果编辑器或预览器激活，不绘制标准输入提示和结果区，由编辑器/预览器负责
-    if (!matrixEditor && !variableViewer)
+    if (!matrixEditor && !variableViewer && !helpViewer)
     {
         drawInputPrompt(); // drawInputPrompt 内部会处理 suggestionBox 的绘制
         drawResultArea();
@@ -96,20 +96,22 @@ void TuiApp::updateUI()
             matrixEditor->updateDimensions(terminalRows, terminalCols);
         }
         if (variableViewer) {
-            // 假设 variableViewer 也有 updateDimensions 方法
             variableViewer->updateDimensions(terminalRows, terminalCols);
+        }
+        if (helpViewer) {
+            helpViewer->updateDimensions(terminalRows, terminalCols);
         }
         
         initUI();
     }
 
     // 更新输入提示行 (仅当编辑器和预览器未激活时)
-    if (!matrixEditor && !variableViewer)
+    if (!matrixEditor && !variableViewer && !helpViewer)
     {
         drawInputPrompt(); // drawInputPrompt 内部会处理 suggestionBox 的绘制
     }
     // 状态栏总是更新 (或者由编辑器/预览器更新自己的状态消息)
-    // drawStatusBar(); // 已移至run循环末尾
+    drawStatusBar(); // 已移至run循环末尾
 }
 
 void TuiApp::run()
@@ -148,6 +150,11 @@ void TuiApp::run()
             updateUI(); // 确保预览器绘制前更新UI
             variableViewer->draw();
             // 状态栏由预览器或TuiApp更新
+        }else if (helpViewer)
+        { // 如果帮助查看器激活
+            updateUI(); // 确保帮助查看器绘制前更新UI
+            helpViewer->draw();
+            // 状态栏由帮助查看器或TuiApp更新
         }
         else
         {

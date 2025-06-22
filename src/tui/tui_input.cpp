@@ -50,6 +50,19 @@ void TuiApp::handleInput()
         return;
     }
     
+    // 如果帮助查看器激活，将输入传递给它
+    if (helpViewer) {
+        EnhancedHelpViewer::ViewerResult result = helpViewer->handleInput(key);
+        statusMessage = helpViewer->getStatusMessage();
+        if (result == EnhancedHelpViewer::ViewerResult::EXIT) {
+            helpViewer.reset();
+            statusMessage = "已退出帮助查看器";
+            initUI(); // 重绘标准UI
+        }
+        // CONTINUE 时状态栏会在 run() 循环中重绘
+        return;
+    }
+    
     // 优先处理候选框输入
     if (suggestionBox->isVisible()) {
         SuggestionAction action = suggestionBox->handleKey(key);

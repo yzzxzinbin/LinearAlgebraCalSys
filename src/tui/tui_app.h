@@ -12,7 +12,8 @@
 #include "../determinant_expansion.h"
 #include "tui_terminal.h"
 #include "enhanced_matrix_editor.h"
-#include "enhanced_variable_viewer.h" // 新增：包含变量预览器
+#include "enhanced_variable_viewer.h"
+#include "enhanced_help_viewer.h"  // 新增：帮助查看器头文件
 #include "tui_suggestion_box.h" // 新增：包含候选框头文件
 #include "../utils/logger.h" // 新增：包含日志记录头文件
 #include "../utils/tui_utils.h" // 新增：包含TUI工具函数头文件
@@ -64,6 +65,8 @@ private:
     std::unique_ptr<EnhancedMatrixEditor> matrixEditor;
     // 新增：增强型变量预览器实例  
     std::unique_ptr<EnhancedVariableViewer> variableViewer;
+    // 新增：帮助查看器实例
+    std::unique_ptr<EnhancedHelpViewer> helpViewer; 
     // 新增：命令候选框实例
     std::unique_ptr<SuggestionBox> suggestionBox;
     
@@ -80,7 +83,6 @@ private:
     void navigateHistory(bool up);
     
     // 命令执行函数
-    void showHelp();
     void showVariables(bool listOnly = false); // 添加参数，当为true时只显示变量名和类型
     void showVariable(const std::string& varName);
     void showVariableWithFormat(const std::string& varName, int precision, bool saveResult = false, const std::string& resultVarName = ""); // -f 选项：有效数字

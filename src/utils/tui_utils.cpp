@@ -484,4 +484,50 @@ std::string trimToUtf8VisualWidth(const std::string& s, size_t targetVisualWidth
     return result;
 }
 
+std::vector<std::string> wordWrap(const std::string& text, size_t maxWidth) {
+    std::vector<std::string> lines;
+    if (maxWidth == 0) return lines;
+    size_t pos = 0;
+    size_t len = text.length();
+    while (pos < len) {
+        // 跳过前导换行
+        if (text[pos] == '\n') {
+            lines.push_back("");
+            ++pos;
+            continue;
+        }
+        // 找到本段的结尾（遇到\n或到末尾）
+        size_t lineEnd = text.find('\n', pos);
+        if (lineEnd == std::string::npos) lineEnd = len;
+        size_t segStart = pos;
+        while (segStart < lineEnd) {
+            size_t segLen = 0;
+            size_t visualWidth = 0;
+            // 按视觉宽度截断
+            while (segStart + segLen < lineEnd && visualWidth < maxWidth) {
+                unsigned char c = text[segStart + segLen];
+                size_t charLen = 1;
+                if (c < 0x80) {
+                } else if ((c & 0xE0) == 0xC0) {
+                    charLen = 2;
+                } else if ((c & 0xF0) == 0xE0) {
+                    charLen = 3;
+                } else if ((c & 0xF8) == 0xF0) {
+                    charLen = 4;
+                }
+                if (segStart + segLen + charLen > lineEnd) break;
+                std::string ch = text.substr(segStart + segLen, charLen);
+                size_t chWidth = TuiUtils::calculateUtf8VisualWidth(ch);
+                if (visualWidth + chWidth > maxWidth) break;
+                segLen += charLen;
+                visualWidth += chWidth;
+            }
+            lines.push_back(text.substr(segStart, segLen));
+            segStart += segLen;
+        }
+        pos = lineEnd + 1;
+    }
+    return lines;
+}
+
 } // namespace TuiUtils

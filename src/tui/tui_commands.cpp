@@ -16,6 +16,7 @@
 #include "../grammar/grammar_tokenizer.h"
 #include "../grammar/grammar_parser.h"
 #include "enhanced_matrix_editor.h"
+#include "enhanced_help_viewer.h"  // 新增：帮助查看器头文件
 #include "tui_suggestion_box.h"
 
 
@@ -441,13 +442,15 @@ void TuiApp::executeCommand(const std::string &input)
                 showVariable(varName);
             }
             return;
-        }
-
-        // 处理help命令
+        }        // 处理help命令
         if (processedInput == "help" || processedInput == "help;")
         {
-            // showHelp 内部使用 resultRow
-            showHelp();
+            // 启动增强型帮助查看器
+            if (!matrixEditor && !variableViewer && !helpViewer) {
+                helpViewer = std::make_unique<EnhancedHelpViewer>(terminalRows, terminalCols);
+                statusMessage = helpViewer->getStatusMessage();
+                initUI(); // 重绘UI以适应帮助查看器
+            }
             return;
         }
 
@@ -653,141 +656,6 @@ void TuiApp::executeCommand(const std::string &input)
 
         statusMessage = "发生未知错误";
     }
-}
-
-void TuiApp::showHelp()
-{
-    if (matrixEditor) return; // 不在编辑器模式下显示帮助
-
-    Terminal::setCursor(resultRow, 0); 
-    Terminal::setForeground(Color::CYAN);
-    std::cout << "帮助信息：\n"; // 示例：这会占用 resultRow
-    resultRow++;                 // 更新 resultRow
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  help                           - 显示此帮助信息\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  clear [-h|-v|-a]               - 清屏/清除历史/清除变量/全部清除\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  vars                           - 显示所有变量\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  show <变量名> [-f<精度>|-p<精度>] [-r <结果变量名>] - 显示变量(可选格式化)\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  exit                           - 退出程序\n";   
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  steps                          - 切换计算步骤显示\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  new <行数> <列数>              - 创建一个新的矩阵变量 (例如: new 2 3)\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  edit <变量名>                  - 编辑已存在的矩阵或向量变量\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  export <文件名>                - 导出所有变量和历史到文件\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  import <文件名>                - 从文件导入变量和历史\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  del <变量名>                   - 删除指定的变量\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  rename <旧变量名> <新变量名>   - 重命名指定的变量\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  csv <变量名>                   - 将 Matrix, Vector 或 Result 类型变量导出为CSV文件\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "变量定义:\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  m1 = [1,2,3;4,5,6] - 定义矩阵\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  v1 = [1,2,3]       - 定义向量\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  f1 = 3/4           - 定义分数\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "基本运算:\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  矩阵: m3 = m1 + m2, m3 = m1 - m2, m3 = m1 * m2 (矩阵乘法)\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  向量: v3 = v1 + v2, v3 = v1 - v2\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "        f_dot = v1 * v2    - 向量点积 (返回分数)\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "        v_cross = v1 x v2  - 向量叉积 (返回向量, 仅3D)\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "矩阵函数:\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  m2 = transpose(m1)        - 矩阵转置\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  m2 = inverse(m1)          - 计算逆矩阵(伴随矩阵法)\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  m2 = inverse_gauss(m1)    - 计算逆矩阵(高斯-若尔当法)\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  f1 = det(m1)              - 计算行列式(默认方法)\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  f1 = det_expansion(m1)    - 按行列展开计算行列式\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  f1 = rank(m1)             - 计算矩阵秩\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  m2 = ref(m1)              - 行阶梯形\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  m2 = rref(m1)             - 最简行阶梯形\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  m2 = cofactor_matrix(m1)  - 计算代数余子式矩阵\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  m2 = adjugate(m1)         - 计算伴随矩阵\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  m_diag = diag(v1)         - 使用向量v1创建对角矩阵\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  sov = solveq(m1, v1)      - 求解方程组 Ax = b (v1可选)\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  m2 = union_rref(m1, m2)   - 向量组联合化行最简形\n";
-    resultRow++;
-    Terminal::setCursor(resultRow, 0);
-    std::cout << "  RS1 = rep_vecset(m1, m2)   - 计算向量组的线性表示\n";
-    // resultRow++; // 最后一行不需要再递增，除非后面还有输出
-    std::cout << "\n"; // 确保最后有换行
-    Terminal::resetColor();
-
-    // 更新状态消息
-    statusMessage = "已显示帮助信息";
 }
 
 // 说明:这是变量预览器编写前用于展示变量的函数
