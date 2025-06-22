@@ -12,7 +12,7 @@ EnhancedVariableViewer::EnhancedVariableViewer(const Interpreter& interp, int te
     std::iostream::sync_with_stdio(false);
     refreshVariableList();
     updateLayout();
-    updateStatus("变量预览器：上下键选择变量，ESC退出");
+    updateStatus("变量预览器:上下键选择变量，ESC退出");
 }
 
 EnhancedVariableViewer::~EnhancedVariableViewer() {
@@ -142,8 +142,8 @@ void EnhancedVariableViewer::draw() {
     Terminal::setCursor(0, 0);
     Terminal::setForeground(Color::CYAN);
     Terminal::setBackground(Color::BLUE);
-    std::string title = " 变量预览器 ";
-    int padding = (terminalCols - title.length()) / 2;
+    std::string title = "  变量预览器";
+    int padding = (terminalCols - TuiUtils::calculateUtf8VisualWidth(title)) / 2;
     std::string header(terminalCols, ' ');
     for (size_t i = 0; i < title.length(); i++) {
         header[padding + i] = title[i];

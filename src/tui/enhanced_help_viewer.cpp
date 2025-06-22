@@ -9,7 +9,7 @@ EnhancedHelpViewer::EnhancedHelpViewer(int termRows, int termCols)
     std::iostream::sync_with_stdio(false);
     initializeHelpContent();
     updateLayout();
-    updateStatus("帮助查看器：↑/↓ 选择主题, ←/→ 翻页, ESC 退出");
+    updateStatus("帮助查看器：↑/↓ 选择主题, ← /→ 翻页, ESC 退出");
 }
 
 EnhancedHelpViewer::~EnhancedHelpViewer() {
@@ -21,11 +21,52 @@ void EnhancedHelpViewer::initializeHelpContent() {
     helpPages.push_back({
         "基础命令",
         {
-            {"help", "显示此帮助信息，进入增强型帮助查看器。\n\n操作:\n- ↑/↓: 选择主题\n- ←/→: 翻页\n- ESC: 退出"},
-            {"clear", "清空屏幕、历史或变量。\n\n用法:\n- clear: 清空屏幕\n- clear -h: 清除命令历史\n- clear -v: 清除所有变量\n- clear -a: 清空屏幕+历史+变量"},
-            {"vars", "显示所有已定义的变量。\n\n用法:\n- vars: 打开增强型变量预览器\n- vars -l: 简单列表模式，显示变量名和类型"},
-            {"exit", "退出程序。\n\n用法:\n- exit: 正常退出（自动保存）\n- exit --no-saving: 退出时不保存变量和历史"},
-            {"steps", "切换计算步骤显示开关。\n\n当开启时，计算过程会显示详细的中间步骤，便于理解和验证计算过程。"}
+            {"\033[1;36mhelp\033[22m", 
+             "显示此帮助信息，进入增强型帮助查看器。\n\n"
+             "\033[1m操作:\033[0m\n"
+             "- \033[1;32m↑/↓\033[0m: 选择主题\n"
+             "- \033[1;32m←/→\033[0m: 翻页\n"
+             "- \033[1;32mESC\033[0m: 退出\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> help\033[0m\n"
+             "\033[36m[效果: 打开帮助浏览器界面]\033[0m"
+            },
+            {"\033[1;36mclear\033[22m", 
+             "清空屏幕、历史或变量。\n\n"
+             "\033[1m用法:\033[0m\n"
+             "- clear: 清空屏幕\n"
+             "- clear -h: 清除命令历史\n"
+             "- clear -v: 清除所有变量\n"
+             "- clear -a: 清空屏幕+历史+变量\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> clear -v\033[0m\n"
+             "\033[36m[效果: 所有变量已清除]\033[0m"
+            },
+            {"\033[1;36mvars\033[22m", 
+             "显示所有已定义的变量。\n\n"
+             "\033[1m用法:\033[0m\n"
+             "- vars: 打开增强型变量预览器\n"
+             "- vars -l: 简单列表模式，显示变量名和类型\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> vars -l\033[0m\n"
+             "\033[36m  m1 : 矩阵 (2×2)\n  v1 : 向量 (3维)\n  f1 : 分数\n  ...\033[0m"
+            },
+            {"\033[1;36mexit\033[22m", 
+             "退出程序。\n\n"
+             "\033[1m用法:\033[0m\n"
+             "- exit: 正常退出（自动保存）\n"
+             "- exit --no-saving: 退出时不保存变量和历史\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> exit --no-saving\033[0m\n"
+             "\033[36m[效果: 退出且不保存工作区]\033[0m"
+            },
+            {"\033[1;36msteps\033[22m", 
+             "切换计算步骤显示开关。\n\n"
+             "当开启时，计算过程会显示详细的中间步骤，便于理解和验证计算过程。\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> steps\033[0m\n"
+             "\033[36m[效果: 计算步骤显示已开启]\033[0m"
+            }
         }
     });
 
@@ -33,10 +74,33 @@ void EnhancedHelpViewer::initializeHelpContent() {
     helpPages.push_back({
         "变量定义",
         {
-            {"矩阵定义", "使用方括号和分号定义矩阵。\n\n格式: 变量名 = [元素1,元素2;元素3,元素4]\n\n示例:\n- m1 = [1,2,3;4,5,6]\n- identity = [1,0;0,1]\n- zeros = [0,0,0;0,0,0]"},
-            {"向量定义", "使用方括号定义向量（一行矩阵）。\n\n格式: 变量名 = [元素1,元素2,元素3]\n\n示例:\n- v1 = [1,2,3]\n- v2 = [0,1,0]\n- position = [3,4,5]"},
-            {"分数定义", "使用斜杠定义分数。\n\n格式: 变量名 = 分子/分母\n\n示例:\n- f1 = 1/2\n- f2 = 3/4\n- f3 = -5/7\n\n注意: 分数会自动化简"},
-            {"复杂表达式", "可以使用表达式直接定义变量。\n\n示例:\n- result = m1 * m2\n- sum_vec = v1 + v2\n- det_val = det(m1)"}
+            {"\033[1;36m矩阵定义\033[22m", 
+             "使用方括号和分号定义矩阵。\n\n"
+             "\033[1m格式:\033[0m 变量名 = [元素1,元素2;元素3,元素4]\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> m1 = [1,2,3;4,5,6]\n> identity = [1,0;0,1]\n> zeros = [0,0,0;0,0,0]\033[0m\n"
+             "\033[36m[效果: 定义矩阵变量]\033[0m"
+            },
+            {"\033[1;36m向量定义\033[22m", 
+             "使用方括号定义向量（一行矩阵）。\n\n"
+             "\033[1m格式:\033[0m 变量名 = [元素1,元素2,元素3]\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> v1 = [1,2,3]\n> v2 = [0,1,0]\n> position = [3,4,5]\033[0m\n"
+             "\033[36m[效果: 定义向量变量]\033[0m"
+            },
+            {"\033[1;36m分数定义\033[22m", 
+             "使用斜杠定义分数。\n\n"
+             "\033[1m格式:\033[0m 变量名 = 分子/分母\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> f1 = 1/2\n> f2 = 3/4\n> f3 = -5/7\033[0m\n"
+             "\033[36m[效果: 定义分数变量，自动化简]\033[0m"
+            },
+            {"\033[1;36m复杂表达式\033[22m", 
+             "可以使用表达式直接定义变量。\n\n"
+             "\033[2m示例:\033[0m\n"
+             "\033[1;33m> result = m1 * m2\n> sum_vec = v1 + v2\n> det_val = det(m1)\033[0m\n"
+             "\033[36m[效果: 变量可由表达式赋值]\033[0m"
+            }
         }
     });
 
@@ -44,11 +108,56 @@ void EnhancedHelpViewer::initializeHelpContent() {
     helpPages.push_back({
         "变量操作",
         {
-            {"show", "显示变量内容，支持格式化输出。\n\n用法:\n- show <var>: 显示原始格式\n- show <var> -f<精度>: 有效数字格式\n- show <var> -p<小数位>: 小数格式\n- show <var> -r <结果变量>: 保存格式化结果"},
-            {"del", "删除指定的变量。\n\n用法: del <变量名>\n\n示例:\n- del m1\n- del temp_result\n\n注意: 删除后无法恢复"},
-            {"rename", "重命名变量。\n\n用法: rename <旧名> <新名>\n\n示例:\n- rename m1 matrix_a\n- rename temp final_result\n\n注意: 新名称不能与已有变量冲突"},
-            {"new", "创建新的矩阵或向量并进入编辑器。\n\n用法:\n- new <维度>: 创建向量\n- new <行数> <列数>: 创建矩阵\n\n示例:\n- new 3 (创建3维向量)\n- new 2 3 (创建2×3矩阵)"},
-            {"edit", "编辑已存在的矩阵或向量。\n\n用法: edit <变量名>\n\n编辑器操作:\n- ↑↓←→: 移动光标\n- 数字/分数: 输入值\n- Tab: 下一个元素\n- ESC: 退出编辑器"}
+            {"\033[1;36mshow\033[22m", 
+             "显示变量内容，支持格式化输出。\n\n"
+             "\033[1m用法:\033[0m\n"
+             "- show <var>: 显示原始格式\n"
+             "- show <var> -f<精度>: 有效数字格式\n"
+             "- show <var> -p<小数位>: 小数格式\n"
+             "- show <var> -r <结果变量>: 保存格式化结果(需结合-p或-f选项)\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> show f1 -f4\033[0m\n"
+             "\033[36m= 0.5\033[0m\n"
+             "\033[1;33m> show m1 -p2\033[0m\n"
+             "\033[36m| 1.00 2.00 3.00 |\n| 4.00 5.00 6.00 |\033[0m"
+            },
+            {"\033[1;36mdel\033[22m", 
+             "删除指定的变量。\n\n"
+             "\033[1m用法:\033[0m del <变量名>\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> del m1\033[0m\n"
+             "\033[36m[效果: 变量 'm1' 已删除]\033[0m"
+            },
+            {"\033[1;36mrename\033[22m", 
+             "重命名变量。\n\n"
+             "\033[1m用法:\033[0m rename <旧名> <新名>\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> rename m1 matrix_a\033[0m\n"
+             "\033[36m[效果: 变量 'm1' 已重命名为 'matrix_a']\033[0m"
+            },
+            {"\033[1;36mnew\033[22m", 
+             "创建新的矩阵或向量并进入编辑器。\n\n"
+             "\033[1m用法:\033[0m\n"
+             "- new <维度>: 创建向量\n"
+             "- new <行数> <列数>: 创建矩阵\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> new 3\033[0m\n"
+             "\033[36m[效果: 创建3维向量并进入编辑器]\033[0m"
+            },
+            {"\033[1;36medit\033[22m", 
+             "编辑已存在的矩阵或向量。\n\n"
+             "\033[1m用法:\033[0m edit <变量名>\n"
+             "\n\033[1m编辑器操作:\033[0m\n"
+             "- ↑↓←→: 移动光标\n"
+             "- 数字/分数: 输入值\n"
+             "- CTRL+ENTER:选中单元格\n"
+             "- CTRL+A:全选\n"
+             "- CTRL+方向键:选中一行/列\n"
+             "- ESC: 退出编辑器\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> edit m1\033[0m\n"
+             "\033[36m[效果: 进入矩阵编辑器]\033[0m"
+            }
         }
     });
 
@@ -56,10 +165,45 @@ void EnhancedHelpViewer::initializeHelpContent() {
     helpPages.push_back({
         "基本运算",
         {
-            {"矩阵运算", "矩阵支持加减乘运算。\n\n运算符:\n- +: 矩阵加法（同型矩阵）\n- -: 矩阵减法（同型矩阵）\n- *: 矩阵乘法（左矩阵列数=右矩阵行数）\n\n示例:\n- sum = m1 + m2\n- diff = m1 - m2\n- product = m1 * m2"},
-            {"向量运算", "向量支持加减、点积、叉积运算。\n\n运算符:\n- +: 向量加法\n- -: 向量减法\n- *: 向量点积（返回分数）\n- x: 向量叉积（仅限3维向量）\n\n示例:\n- sum = v1 + v2\n- dot_product = v1 * v2\n- cross_product = v1 x v2"},
-            {"分数运算", "分数支持四则运算。\n\n运算符:\n- +, -, *, /: 四则运算\n\n示例:\n- sum = f1 + f2\n- product = f1 * f2\n- quotient = f1 / f2\n\n注意: 结果自动化简"},
-            {"混合运算", "矩阵与标量、向量与标量的运算。\n\n支持的运算:\n- 矩阵 * 标量\n- 标量 * 矩阵\n- 向量 * 标量\n- 标量 * 向量\n\n示例:\n- scaled = 2 * m1\n- doubled = v1 * 2"}
+            {"\033[1;36m矩阵运算\033[22m", 
+             "矩阵支持加减乘运算。\n\n"
+             "\033[1m运算符:\033[0m\n"
+             "- +: 矩阵加法（同型矩阵）\n"
+             "- -: 矩阵减法（同型矩阵）\n"
+             "- *: 矩阵乘法（左矩阵列数=右矩阵行数）\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> sum = m1 + m2\n> diff = m1 - m2\n> product = m1 * m2\033[0m\n"
+             "\033[36m[效果: 计算矩阵加减乘]\033[0m"
+            },
+            {"\033[1;36m向量运算\033[22m", 
+             "向量支持加减、点积、叉积运算。\n\n"
+             "\033[1m运算符:\033[0m\n"
+             "- +: 向量加法\n"
+             "- -: 向量减法\n"
+             "- *: 向量点积（返回分数）\n"
+             "- x: 向量叉积（仅限3维向量）\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> sum = v1 + v2\n> dot_product = v1 * v2\n> cross_product = v1 x v2\033[0m\n"
+             "\033[36m[效果: 计算向量加减/点积/叉积]\033[0m"
+            },
+            {"\033[1;36m分数运算\033[22m", 
+             "分数支持四则运算。\n\n"
+             "\033[1m运算符:\033[0m +, -, *, /\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> sum = f1 + f2\n> product = f1 * f2\n> quotient = f1 / f2\033[0m\n"
+             "\033[36m[效果: 分数自动化简]\033[0m"
+            },
+            {"\033[1;36m混合运算\033[22m", 
+             "矩阵与标量、向量与标量的运算。\n\n"
+             "\033[1m支持的运算:\033[0m\n"
+             "- 矩阵 * 标量\n"
+             "- 标量 * 矩阵\n"
+             "- 向量 * 标量\n"
+             "- 标量 * 向量\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> scaled = 2 * m1\n> doubled = v1 * 2\033[0m\n"
+             "\033[36m[效果: 结果为放大后的矩阵/向量]\033[0m"
+            }
         }
     });
 
@@ -67,13 +211,61 @@ void EnhancedHelpViewer::initializeHelpContent() {
     helpPages.push_back({
         "矩阵函数",
         {
-            {"transpose", "计算矩阵转置。\n\n用法: transpose(matrix)\n\n示例:\n- mt = transpose(m1)\n\n说明: 将矩阵的行列互换"},
-            {"det", "计算方阵的行列式。\n\n用法:\n- det(matrix): 默认算法\n- det_expansion(matrix): 按行列展开\n\n示例:\n- d = det(m1)\n- d2 = det_expansion(m1)\n\n注意: 仅适用于方阵"},
-            {"inverse", "计算方阵的逆矩阵。\n\n用法:\n- inverse(matrix): 伴随矩阵法\n- inverse_gauss(matrix): 高斯-若尔当法\n\n示例:\n- inv1 = inverse(m1)\n- inv2 = inverse_gauss(m1)\n\n注意: 矩阵必须可逆"},
-            {"rank", "计算矩阵的秩。\n\n用法: rank(matrix)\n\n示例:\n- r = rank(m1)\n\n说明: 返回矩阵的线性无关行（列）数"},
-            {"ref/rref", "行阶梯形和最简行阶梯形。\n\n用法:\n- ref(matrix): 行阶梯形\n- rref(matrix): 最简行阶梯形\n\n示例:\n- ref_form = ref(m1)\n- rref_form = rref(m1)"},
-            {"cofactor_matrix", "计算代数余子式矩阵。\n\n用法: cofactor_matrix(matrix)\n\n示例:\n- cof = cofactor_matrix(m1)\n\n说明: 每个元素替换为对应的代数余子式"},
-            {"adjugate", "计算伴随矩阵。\n\n用法: adjugate(matrix)\n\n示例:\n- adj = adjugate(m1)\n\n说明: 代数余子式矩阵的转置"}
+            {"\033[1;36mtranspose()\033[22m", 
+             "计算矩阵转置。\n\n"
+             "\033[1m用法:\033[0m transpose(matrix)\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> mt = transpose(m1)\033[0m\n"
+             "\033[36m[效果: mt 为 m1 的转置矩阵]\033[0m"
+            },
+            {"\033[1;36mdet()\033[22m", 
+             "计算方阵的行列式。\n\n"
+             "\033[1m用法:\033[0m\n"
+             "- det(matrix): 默认算法\n"
+             "- det_expansion(matrix): 按行列展开\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> d = det(m1)\n> d2 = det_expansion(m1)\033[0m\n"
+             "\033[36m[效果: 结果为分数型行列式值]\033[0m"
+            },
+            {"\033[1;36minverse()\033[22m", 
+             "计算方阵的逆矩阵。\n\n"
+             "\033[1m用法:\033[0m\n"
+             "- inverse(matrix): 伴随矩阵法\n"
+             "- inverse_gauss(matrix): 高斯-若尔当法\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> inv1 = inverse(m1)\n> inv2 = inverse_gauss(m1)\033[0m\n"
+             "\033[36m[效果: 结果为逆矩阵]\033[0m"
+            },
+            {"\033[1;36mrank()\033[22m", 
+             "计算矩阵的秩。\n\n"
+             "\033[1m用法:\033[0m rank(matrix)\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> r = rank(m1)\033[0m\n"
+             "\033[36m[效果: r 为秩的整数值]\033[0m"
+            },
+            {"\033[1;36mref()/rref()\033[22m", 
+             "行阶梯形和最简行阶梯形。\n\n"
+             "\033[1m用法:\033[0m\n"
+             "- ref(matrix): 行阶梯形\n"
+             "- rref(matrix): 最简行阶梯形\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> ref_form = ref(m1)\n> rref_form = rref(m1)\033[0m\n"
+             "\033[36m[效果: 结果为化简后的矩阵]\033[0m"
+            },
+            {"\033[1;36mcofactor_matrix()\033[22m", 
+             "计算代数余子式矩阵。\n\n"
+             "\033[1m用法:\033[0m cofactor_matrix(matrix)\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> cof = cofactor_matrix(m1)\033[0m\n"
+             "\033[36m[效果: 结果为代数余子式矩阵]\033[0m"
+            },
+            {"\033[1;36madjugate()\033[22m", 
+             "计算伴随矩阵。\n\n"
+             "\033[1m用法:\033[0m adjugate(matrix)\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> adj = adjugate(m1)\033[0m\n"
+             "\033[36m[效果: 结果为伴随矩阵]\033[0m"
+            }
         }
     });
 
@@ -81,11 +273,51 @@ void EnhancedHelpViewer::initializeHelpContent() {
     helpPages.push_back({
         "高级功能",
         {
-            {"diag", "使用向量创建对角矩阵。\n\n用法: diag(vector)\n\n示例:\n- v = [1,2,3]\n- diagonal = diag(v)\n\n结果: 3×3对角矩阵"},
-            {"solveq", "求解线性方程组。\n\n用法:\n- solveq(A): 求解 Ax = 0\n- solveq(A, b): 求解 Ax = b\n\n示例:\n- solution = solveq(m1, v1)\n\n说明: 返回方程组解的向量或解集"},
-            {"union_rref", "向量组联合化行最简形。\n\n用法: union_rref(A, B)\n\n示例:\n- combined = union_rref(m1, m2)\n\n说明: 将两个矩阵按列合并后化简"},
-            {"rep_vecset", "计算向量组的线性表示。\n\n用法: rep_vecset(A, B)\n\n示例:\n- representation = rep_vecset(m1, m2)\n\n说明: 计算B中向量能否由A中向量线性表示"},
-            {"向量函数", "向量专用函数。\n\n函数:\n- dot(v1, v2): 点积\n- cross(v1, v2): 叉积\n- norm(v): 向量模长\n- normalize(v): 单位化\n\n示例:\n- length = norm(v1)\n- unit = normalize(v1)"}
+            {"\033[1;36mdiag()\033[22m", 
+             "使用向量创建对角矩阵。\n\n"
+             "\033[1m用法:\033[0m diag(vector)\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> v = [1,2,3]\n> diagonal = diag(v)\033[0m\n"
+             "\033[36m[效果: diagonal 为3×3对角矩阵]\033[0m\n"
+             "\ndiagnal = \n"
+                "    \033[36m|\033[0m 1 0 0 \033[36m|\033[0m\n"
+                "    \033[36m|\033[0m 0 2 0 \033[36m|\033[0m\n"
+                "    \033[36m|\033[0m 0 0 3 \033[36m|\033[0m\n"
+            },
+            {"\033[1;36msolveq()\033[22m", 
+             "求解线性方程组。\n\n"
+             "\033[1m用法:\033[0m\n"
+             "- solveq(A): 求解 Ax = 0\n"
+             "- solveq(A, b): 求解 Ax = b\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> solution = solveq(m1, v1)\033[0m\n"
+             "\033[36m[效果: solution 为解向量或解集]\033[0m"
+            },
+            {"\033[1;36munion_rref()\033[22m", 
+             "向量组联合化行最简形。\n\n"
+             "\033[1m用法:\033[0m union_rref(A, B)\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> combined = union_rref(m1, m2)\033[0m\n"
+             "\033[36m[效果: 结果为合并并化简后的矩阵]\033[0m"
+            },
+            {"\033[1;36mrep_vecset()\033[22m", 
+             "计算向量组的线性表示。\n\n"
+             "\033[1m用法:\033[0m rep_vecset(A, B)\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> representation = rep_vecset(m1, m2)\033[0m\n"
+             "\033[36m[效果: 判断B中向量能否由A线性表示]\033[0m"
+            },
+            {"\033[1;36m向量函数\033[22m", 
+             "向量专用函数。\n\n"
+             "\033[1m函数:\033[0m\n"
+             "- dot(v1, v2): 点积\n"
+             "- cross(v1, v2): 叉积\n"
+             "- norm(v): 向量模长\n"
+             "- normalize(v): 单位化\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> length = norm(v1)\n> unit = normalize(v1)\033[0m\n"
+             "\033[36m[效果: 计算模长或单位向量]\033[0m"
+            }
         }
     });
 
@@ -93,10 +325,37 @@ void EnhancedHelpViewer::initializeHelpContent() {
     helpPages.push_back({
         "文件操作",
         {
-            {"export", "导出变量和历史到文件。\n\n用法: export <文件名>\n\n示例:\n- export \"my_work.dat\"\n- export session.dat\n\n说明: 保存所有变量和命令历史"},
-            {"import", "从文件导入变量和历史。\n\n用法: import <文件名>\n\n示例:\n- import \"my_work.dat\"\n- import session.dat\n\n说明: 加载变量和历史记录"},
-            {"csv", "导出变量为CSV格式。\n\n用法: csv <变量名>\n\n示例:\n- csv m1\n- csv result_matrix\n\n说明: 仅支持Matrix、Vector和Result类型\n文件名为: <变量名>.csv"},
-            {"自动保存", "程序退出时自动保存。\n\n特性:\n- 正常退出时自动保存到 workspace.dat\n- 使用 exit --no-saving 可跳过保存\n- 下次启动时自动加载工作环境\n\n文件位置: 程序当前目录"}
+            {"\033[1;36mexport\033[22m", 
+             "导出变量和历史到文件。\n\n"
+             "\033[1m用法:\033[0m export <文件名>/<\"绝对路径\">\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> export session.dat\033[0m\n"
+             "\033[36m[效果: 保存所有变量和命令历史]\033[0m"
+            },
+            {"\033[1;36mimport\033[22m", 
+             "从文件导入变量和历史。\n\n"
+             "\033[1m用法:\033[0m import <文件名>\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> import \"K:\\rebel.txt\"\n> import session.dat\033[0m\n"
+             "\033[36m[效果: 加载变量和历史记录]\033[0m"
+            },
+            {"\033[1;36mcsv\033[22m", 
+             "导出变量为CSV格式。\n\n"
+             "\033[1m用法:\033[0m csv <变量名>\n"
+             "\033[1m\033[38;5;196m注意:\033[0m 仅支持Matrix, Vector, 或 Result 类型导出为CSV格式\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> csv m1\n> csv result_matrix\033[0m\n"
+             "\033[36m[效果: 生成 <变量名>.csv 文件]\033[0m"
+            },
+            {"\033[1;36m自动保存\033[22m", 
+             "程序退出时自动保存。\n\n"
+             "\033[1m特性:\033[0m\n"
+             "- 正常退出时自动保存到启动时选择的工作文件\n"
+             "- 意外退出时会执行基于系统平台的进程退出回调,不确保一定能成功保存\n"
+             "- 使用 exit --no-saving 可跳过保存\n"
+             "- 若启动时未选择工作文件，则不进行自动保存\n"
+             "\n\033[1m文件位置:\033[0m 程序当前目录"
+            },
         }
     });
 }
@@ -227,10 +486,19 @@ void EnhancedHelpViewer::drawTopicList() {
             Terminal::setForeground(Color::BLACK);
         }
 
-        std::string line = " " + topic.title;
-        line.resize(listWidth, ' ');
-        
-        std::cout << TuiUtils::trimToUtf8VisualWidth(line, listWidth);
+        // 显示文本处理
+        std::string text = topic.title;
+        size_t textWidth = TuiUtils::calculateUtf8VisualWidth(text);
+        int availWidth = listWidth - 2; // 两侧空格
+        if ((int)textWidth > availWidth) {
+            text = TuiUtils::trimToUtf8VisualWidth(text, availWidth - 3) + "...";
+            textWidth = TuiUtils::calculateUtf8VisualWidth(text);
+        }
+        int padding = availWidth - textWidth;
+        if (padding < 0) padding = 0;
+        std::string line = " " + text + std::string(padding, ' ') + " ";
+
+        std::cout << line;
 
         if (isSelected) {
             Terminal::resetColor();

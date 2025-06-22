@@ -331,9 +331,10 @@ std::string trimToVisualWidth(const std::string& s, size_t visualWidth) {
 
 // 计算UTF-8字符串实际视觉宽度的通用函数方案 兼容PUA字符
 size_t calculateUtf8VisualWidth(const std::string& s) {
+    std::string str = stripAnsiEscape(s);
     size_t visual_width = 0;
-    for (size_t i = 0; i < s.length(); ) {
-        unsigned char byte = static_cast<unsigned char>(s[i]);
+    for (size_t i = 0; i < str.length(); ) {
+        unsigned char byte = static_cast<unsigned char>(str[i]);
         size_t char_len = 1;
         size_t char_visual_width = 1;
         uint32_t codepoint = 0; // 用于存储解码后的码点
@@ -343,16 +344,16 @@ size_t calculateUtf8VisualWidth(const std::string& s) {
             // char_len = 1, char_visual_width = 1 (already set)
         } else if ((byte & 0xE0) == 0xC0) { // 2-byte sequence (110xxxxx 10xxxxxx)
             char_len = 2;
-            if (i + 1 < s.length() && (static_cast<unsigned char>(s[i+1]) & 0xC0) == 0x80) {
-                codepoint = ((byte & 0x1F) << 6) | (static_cast<unsigned char>(s[i+1]) & 0x3F);
+            if (i + 1 < str.length() && (static_cast<unsigned char>(str[i+1]) & 0xC0) == 0x80) {
+                codepoint = ((byte & 0x1F) << 6) | (static_cast<unsigned char>(str[i+1]) & 0x3F);
                 char_visual_width = 2; 
             } else { // Malformed
                 char_len = 1; char_visual_width = 1; codepoint = byte;
             }
         } else if ((byte & 0xF0) == 0xE0) { // 3-byte sequence (1110xxxx 10xxxxxx 10xxxxxx)
             char_len = 3;
-            if (i + 2 < s.length() && (static_cast<unsigned char>(s[i+1]) & 0xC0) == 0x80 && (static_cast<unsigned char>(s[i+2]) & 0xC0) == 0x80) {
-                codepoint = ((byte & 0x0F) << 12) | ((static_cast<unsigned char>(s[i+1]) & 0x3F) << 6) | (static_cast<unsigned char>(s[i+2]) & 0x3F);
+            if (i + 2 < str.length() && (static_cast<unsigned char>(str[i+1]) & 0xC0) == 0x80 && (static_cast<unsigned char>(str[i+2]) & 0xC0) == 0x80) {
+                codepoint = ((byte & 0x0F) << 12) | ((static_cast<unsigned char>(str[i+1]) & 0x3F) << 6) | (static_cast<unsigned char>(str[i+2]) & 0x3F);
                 if (codepoint >= 0x2500 && codepoint <= 0x257F) { // Box Drawing characters
                     char_visual_width = 1;
                 } else {
@@ -363,8 +364,8 @@ size_t calculateUtf8VisualWidth(const std::string& s) {
             }
         } else if ((byte & 0xF8) == 0xF0) { // 4-byte sequence (11110xxx 10xxxxxx 10xxxxxx 10xxxxxx)
             char_len = 4;
-            if (i + 3 < s.length() && (static_cast<unsigned char>(s[i+1]) & 0xC0) == 0x80 && (static_cast<unsigned char>(s[i+2]) & 0xC0) == 0x80 && (static_cast<unsigned char>(s[i+3]) & 0xC0) == 0x80) {
-                codepoint = ((byte & 0x07) << 18) | ((static_cast<unsigned char>(s[i+1]) & 0x3F) << 12) | ((static_cast<unsigned char>(s[i+2]) & 0x3F) << 6) | (static_cast<unsigned char>(s[i+3]) & 0x3F);
+            if (i + 3 < str.length() && (static_cast<unsigned char>(str[i+1]) & 0xC0) == 0x80 && (static_cast<unsigned char>(str[i+2]) & 0xC0) == 0x80 && (static_cast<unsigned char>(str[i+3]) & 0xC0) == 0x80) {
+                codepoint = ((byte & 0x07) << 18) | ((static_cast<unsigned char>(str[i+1]) & 0x3F) << 12) | ((static_cast<unsigned char>(str[i+2]) & 0x3F) << 6) | (static_cast<unsigned char>(str[i+3]) & 0x3F);
                 char_visual_width = 2; 
             } else { // Malformed
                 char_len = 1; char_visual_width = 1; codepoint = byte;
@@ -401,6 +402,19 @@ size_t calculateUtf8VisualWidth(const std::string& s) {
         } else if (codepoint >= 0x0080 && codepoint <= 0x00FF) { // 拉丁-1补充
             char_visual_width = 1;
         } else if (codepoint >= 0x0100 && codepoint <= 0x02AF) { // 扩展
+            char_visual_width = 1;
+        }
+
+        if (codepoint >= 0x2190 && codepoint <= 0x21FF)
+        { // 箭头区块
+            char_visual_width = 1;
+        }
+        else if (codepoint >= 0x27F0 && codepoint <= 0x27FF)
+        { // 补充箭头
+            char_visual_width = 1;
+        }
+        else if (codepoint >= 0x2B00 && codepoint <= 0x2BFF)
+        { // 杂项箭头
             char_visual_width = 1;
         }
         // --- end 新增 ---
@@ -528,6 +542,71 @@ std::vector<std::string> wordWrap(const std::string& text, size_t maxWidth) {
         pos = lineEnd + 1;
     }
     return lines;
+}
+
+// 过滤 ANSI 转义序列
+std::string stripAnsiEscape(const std::string& s) {
+    std::string out;
+    out.reserve(s.size()); // 预分配内存优化
+    
+    for (size_t i = 0; i < s.size(); ) {
+        if (s[i] == '\x1B') { // 遇到转义字符
+            if (i + 1 >= s.size()) {
+                break; // 不完整的转义序列，直接结束
+            }
+            
+            // 处理 CSI 序列 (ESC [)
+            if (s[i+1] == '[') {
+                i += 2; // 跳过 ESC [
+                
+                // 跳过参数部分，直到命令字符
+                while (i < s.size() && (isdigit(s[i]) || s[i] == ';' || s[i] == '?')) {
+                    i++;
+                }
+                
+                // 跳过命令字符 (在 0x40-0x7E 之间)
+                if (i < s.size() && s[i] >= '@' && s[i] <= '~') {
+                    i++;
+                }
+                continue;
+            }
+            // 处理 OSC 序列 (ESC ])
+            else if (s[i+1] == ']') {
+                i += 2; // 跳过 ESC ]
+                
+                // 跳过直到 BEL (\a) 或 ST (\x1B\\)
+                while (i < s.size()) {
+                    if (s[i] == '\x07') { // BEL 终止符
+                        i++;
+                        break;
+                    }
+                    // ST 终止符 (ESC \)
+                    if (s[i] == '\x1B' && i+1 < s.size() && s[i+1] == '\\') {
+                        i += 2;
+                        break;
+                    }
+                    i++;
+                }
+                continue;
+            }
+            // 处理单字符控制序列
+            else if (isalpha(s[i+1]) || s[i+1] == '7' || s[i+1] == '8' || s[i+1] == '=' || s[i+1] == '>') {
+                i += 2; // 跳过 ESC + 单字符
+                continue;
+            }
+            // 其他未知转义序列，跳过 ESC 字符
+            else {
+                i++;
+                continue;
+            }
+        }
+        
+        // 普通字符，添加到输出
+        out.push_back(s[i]);
+        i++;
+    }
+    
+    return out;
 }
 
 } // namespace TuiUtils

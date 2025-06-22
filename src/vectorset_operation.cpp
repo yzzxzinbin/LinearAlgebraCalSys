@@ -164,7 +164,7 @@ Result rep_vecset(const Matrix& set1, const Matrix& set2) {
         colWidths2[j] = std::max(colWidths2[j], TuiUtils::calculateUtf8VisualWidth(betaNames[j]));
 
     // 2. 彩色编号和分隔线
-    oss << "\033[36m① 增广矩阵 [set1 ┆ set2]：\033[0m\n";
+    oss << "\033[36m① 增广矩阵 [set1 ┆ set2]:\033[0m\n";
     // 分隔线
     oss << std::string(2, ' ');
     for (size_t j = 0; j < n1; ++j) oss << std::string(colWidths1[j], '-') << " ";
@@ -219,7 +219,7 @@ Result rep_vecset(const Matrix& set1, const Matrix& set2) {
     Matrix set1_rref = MatrixOperations::toReducedRowEchelonForm(set1);
     Matrix set2_rref = unionrref(set1, set2); // set2_rref已同步行变换
 
-    oss << "\033[36m② set1 ────────> set2：\033[0m\n";
+    oss << "\033[36m② set1 ────────> set2:\033[0m\n";
     if (can12) {
         oss << "\033[33mset1 可以线性表示 set2:\033[0m\n";
         for (size_t j = 0; j < n2; ++j) {
@@ -236,7 +236,7 @@ Result rep_vecset(const Matrix& set1, const Matrix& set2) {
             oss << "\n";
         }
         // 输出联合rref增广矩阵
-        oss << "\n\033[33m联合最简行阶梯形增广矩阵 [rref(set1) ┆ B']：\033[0m\n";
+        oss << "\n\033[33m联合最简行阶梯形增广矩阵 [rref(set1) ┆ set2']:\033[0m\n";
         // 计算宽度
         std::vector<size_t> colW1(n1, 0), colW2(n2, 0);
         for (size_t j = 0; j < n1; ++j) {
@@ -312,7 +312,7 @@ Result rep_vecset(const Matrix& set1, const Matrix& set2) {
     set2_rref = MatrixOperations::toReducedRowEchelonForm(set2);
     set1_rref2 = unionrref(set2, set1);
 
-    oss << "\033[36m③ set2 ────────> set1：\033[0m\n";
+    oss << "\033[36m③ set2 ────────> set1:\033[0m\n";
     if (can21) {
         oss << "\033[33mset2 可以线性表示 set1:\033[0m\n";
         for (size_t j = 0; j < n1; ++j) {
@@ -329,7 +329,7 @@ Result rep_vecset(const Matrix& set1, const Matrix& set2) {
             oss << "\n";
         }
         // 输出联合rref增广矩阵，始终左A右B
-        oss << "\n\033[33m联合最简行阶梯形增广矩阵 [rref(set1) ┆ A']：\033[0m\n";
+        oss << "\n\033[33m联合最简行阶梯形增广矩阵 [ set1' ┆ rref(set2) ]:\033[0m\n";
         // 计算宽度
         std::vector<size_t> colW1b(n1, 0), colW2b(n2, 0);
         for (size_t j = 0; j < n1; ++j) {
