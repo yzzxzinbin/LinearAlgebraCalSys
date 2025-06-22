@@ -501,6 +501,8 @@ std::string trimToUtf8VisualWidth(const std::string& s, size_t targetVisualWidth
 std::vector<std::string> wordWrap(const std::string& text, size_t maxWidth) {
     std::vector<std::string> lines;
     if (maxWidth == 0) return lines;
+    // 保留1列边距而不是2列
+    if (maxWidth > 1) maxWidth += 2;
     size_t pos = 0;
     size_t len = text.length();
     while (pos < len) {
@@ -515,11 +517,28 @@ std::vector<std::string> wordWrap(const std::string& text, size_t maxWidth) {
         if (lineEnd == std::string::npos) lineEnd = len;
         size_t segStart = pos;
         while (segStart < lineEnd) {
-            size_t segLen = 0;
+            size_t i = segStart;
             size_t visualWidth = 0;
-            // 按视觉宽度截断
-            while (segStart + segLen < lineEnd && visualWidth < maxWidth) {
-                unsigned char c = text[segStart + segLen];
+            std::string line;
+            while (i < lineEnd && visualWidth < maxWidth) {
+                // 检查ANSI转义序列
+                if (text[i] == '\x1B' && i + 1 < lineEnd && text[i + 1] == '[') {
+                    size_t escEnd = i + 2;
+                    // 跳过参数部分
+                    while (escEnd < lineEnd && (isdigit(text[escEnd]) || text[escEnd] == ';' || text[escEnd] == '?')) {
+                        ++escEnd;
+                    }
+                    // 跳过命令字符
+                    if (escEnd < lineEnd && text[escEnd] >= '@' && text[escEnd] <= '~') {
+                        ++escEnd;
+                    }
+                    line.append(text, i, escEnd - i);
+                    i = escEnd;
+                    continue;
+                }
+                // 其他ESC序列（如ESC]等）可按需扩展
+                // 处理UTF-8字符
+                unsigned char c = text[i];
                 size_t charLen = 1;
                 if (c < 0x80) {
                 } else if ((c & 0xE0) == 0xC0) {
@@ -529,15 +548,16 @@ std::vector<std::string> wordWrap(const std::string& text, size_t maxWidth) {
                 } else if ((c & 0xF8) == 0xF0) {
                     charLen = 4;
                 }
-                if (segStart + segLen + charLen > lineEnd) break;
-                std::string ch = text.substr(segStart + segLen, charLen);
+                if (i + charLen > lineEnd) break;
+                std::string ch = text.substr(i, charLen);
                 size_t chWidth = TuiUtils::calculateUtf8VisualWidth(ch);
                 if (visualWidth + chWidth > maxWidth) break;
-                segLen += charLen;
+                line += ch;
                 visualWidth += chWidth;
+                i += charLen;
             }
-            lines.push_back(text.substr(segStart, segLen));
-            segStart += segLen;
+            lines.push_back(line);
+            segStart = i;
         }
         pos = lineEnd + 1;
     }

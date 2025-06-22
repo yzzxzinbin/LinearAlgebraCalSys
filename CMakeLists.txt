@@ -67,11 +67,11 @@ endif()
 # 添加主可执行文件 ------------------
 add_executable(LinearAlgebraCalSys ${APP_SOURCES})
 
-# 添加编译选项
+# 优化编译选项（减小体积 + 提升速度）
 target_compile_options(LinearAlgebraCalSys PRIVATE
- # 用于调试
-    -O2 # 用于优化，根据需要取消注释
-    -fopenmp # 如果使用OpenMP，根据需要取消注释
+    -O2               # 编译优化
+    -ffunction-sections -fdata-sections  # 允许链接器去除未使用的代码
+    -fopenmp         # 启用 OpenMP 支持
 )
 
 # 查找 OpenMP 包
@@ -86,14 +86,15 @@ endif()
 target_link_libraries(LinearAlgebraCalSys PRIVATE OpenMP::OpenMP_CXX)
 
 # 添加链接选项
-target_link_options(LinearAlgebraCalSys PRIVATE )
+target_link_options(LinearAlgebraCalSys PRIVATE 
+    -static           # 静态链接
+    -Wl,--gc-sections   # 去除未使用的段
+    -Wl,--strip-all     # 去除所有符号表（发布时用）
+)
 
 # 链接库
 target_link_libraries(LinearAlgebraCalSys PRIVATE
-    advapi32
-    gdi32
-    winmm
-    fmt
+
 )
 
 # 添加测试可执行文件 - 第一阶段
