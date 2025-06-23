@@ -12,7 +12,7 @@
 const std::vector<std::string> TuiApp::KNOWN_FUNCTIONS = {
     "transpose", "inverse", "inverse_gauss", "det", "det_expansion",
     "rank", "ref", "rref", "cofactor_matrix", "adjugate",
-    "dot", "cross", "norm", "normalize", "diag", "solveq", "rs_rep_vecset", "union_rref", "rep_vecsingle"
+    "dot", "cross", "norm", "normalize", "diag", "solveq", "RS_rep_vecset", "union_rref", "rep_vecsingle", "max_independentset_col", "max_independentset_row"
     // 可以根据实际情况添加更多函数
 };
 

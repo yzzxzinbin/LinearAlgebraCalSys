@@ -271,6 +271,7 @@ void EnhancedHelpViewer::initializeHelpContent() {
              "\033[1m用法:\033[0m diag(vector)\n"
              "\n\033[2m示例:\033[0m\n"
              "\033[1;33m> v = [1,2,3]\n> diagonal = diag(v)\033[0m\n"
+             "\033[1;33m> diagonal2 = diag(1, 2, 3)\033[0m\n"
              "\033[36m[效果: diagonal 为3×3对角矩阵]\033[0m\n"
              "\ndiagnal = \n"
                 "    \033[36m|\033[0m 1 0 0 \033[36m|\033[0m\n"
@@ -293,11 +294,11 @@ void EnhancedHelpViewer::initializeHelpContent() {
              "\033[1;33m> combined = union_rref(m1, m2)\033[0m\n"
              "\033[36m[效果: 结果为合并并化简后的矩阵]\033[0m"
             },
-            {"\033[1;36mrs_rep_vecset()\033[22m", 
+            {"\033[1;36mRS_rep_vecset()\033[22m", 
              "计算向量组的线性表示。\n\n"
-             "\033[1m用法:\033[0m rep_vecset(A, B)\n"
+             "\033[1m用法:\033[0m RS_rep_vecset(A, B)\n"
              "\n\033[2m示例:\033[0m\n"
-             "\033[1;33m> representation = rs_rep_vecset(m1, m2)\033[0m\n"
+             "\033[1;33m> representation = RS_rep_vecset(m1, m2)\033[0m\n"
              "\033[36m[效果: 解析A B是否能互相线性表示]\033[0m"
             },
             {"\033[1;36mrep_vecsingle()\033[22m", 
@@ -309,6 +310,24 @@ void EnhancedHelpViewer::initializeHelpContent() {
              "\n\033[2m示例:\033[0m\n"
              "\033[1;33m> coeffs = rep_vecsingle(m1, v1)\033[0m\n"
              "\033[36m[效果: 若能线性表示，返回系数列矩阵；否则返回全0列矩阵]\033[0m"
+            },
+            {"\033[1;36mmax_independentset_col()\033[22m",
+             "计算矩阵的极大线性无关列向量组。\n\n"
+             "\033[1m用法:\033[0m max_independentset_col(A)\n"
+             "\033[1m参数:\033[0m\n"
+             "- A: 矩阵\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> basis = max_independentset_col(m1)\033[0m\n"
+             "\033[36m[效果: 返回m1的极大线性无关列向量组（子矩阵）]\033[0m"
+            },
+            {"\033[1;36mmax_independentset_row()\033[22m",
+             "计算矩阵的极大线性无关行向量组。\n\n"
+             "\033[1m用法:\033[0m max_independentset_row(A)\n"
+             "\033[1m参数:\033[0m\n"
+             "- A: 矩阵\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> basis = max_independentset_row(m1)\033[0m\n"
+             "\033[36m[效果: 返回m1的极大线性无关行向量组（子矩阵）]\033[0m"
             },
             {"\033[1;36m向量函数\033[22m", 
              "向量专用函数。\n\n"

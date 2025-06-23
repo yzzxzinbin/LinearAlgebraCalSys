@@ -136,7 +136,31 @@ Matrix unionrref(const Matrix& A, const Matrix& B) {
     return b;
 }
 
-Result rep_vecset(const Matrix& set1, const Matrix& set2) {
+// 新增：判断setA能否线性表示v，返回系数列或全0列
+Matrix rep_vecsingle(const Matrix& setA, const Vector& v) {
+    if (setA.rowCount() != v.size()) throw std::runtime_error("rep_vecsingle: 维数不匹配");
+    // 检查v是否全为0（解析器已做，这里冗余防御）
+    bool allZero = true;
+    for (size_t i = 0; i < v.size(); ++i) {
+        if (v.at(i) != Fraction(0)) { allZero = false; break; }
+    }
+    if (allZero) throw std::runtime_error("rep_vecsingle: 目标向量不能全为0");
+    // 求解 setA * x = v
+    Matrix b_col(v.size(), 1);
+    for (size_t i = 0; i < v.size(); ++i) b_col.at(i, 0) = v.at(i);
+    EquationSolver solver;
+    EquationSolution sol = solver.solve(setA, b_col);
+    if (!sol.hasSolution() || !sol.hasUniqueSolution()) {
+        // 返回全0列
+        Matrix zeroCol(setA.colCount(), 1);
+        return zeroCol;
+    } else {
+        // 返回系数列
+        return sol.getParticularSolution();
+    }
+}
+
+Result RS_rep_vecset(const Matrix& set1, const Matrix& set2) {
     std::ostringstream oss;
     size_t n1 = set1.colCount(), n2 = set2.colCount();
     size_t rows = set1.rowCount();
@@ -403,4 +427,47 @@ Result rep_vecset(const Matrix& set1, const Matrix& set2) {
     }
 
     return Result::fromString(oss.str());
+}
+
+Matrix max_independentset_col(const Matrix& mat) {
+    // 利用最简行阶梯形，主元所在的列即为极大无关组
+    size_t rows = mat.rowCount();
+    size_t cols = mat.colCount();
+    if (rows == 0 || cols == 0) return Matrix(0, 0);
+
+    Matrix rref = MatrixOperations::toReducedRowEchelonForm(mat);
+    std::vector<size_t> pivotCols;
+    size_t r = 0, c = 0;
+    while (r < rows && c < cols) {
+        // 找到主元
+        if (rref.at(r, c) == Fraction(1)) {
+            // 检查该列除主元外是否全为0
+            bool isPivot = true;
+            for (size_t i = 0; i < rows; ++i) {
+                if (i != r && rref.at(i, c) != Fraction(0)) {
+                    isPivot = false;
+                    break;
+                }
+            }
+            if (isPivot) {
+                pivotCols.push_back(c);
+                ++r;
+            }
+        }
+        ++c;
+    }
+    Matrix result(rows, pivotCols.size());
+    for (size_t j = 0; j < pivotCols.size(); ++j) {
+        for (size_t i = 0; i < rows; ++i) {
+            result.at(i, j) = mat.at(i, pivotCols[j]);
+        }
+    }
+    return result;
+}
+
+Matrix max_independentset_row(const Matrix& mat) {
+    // 利用转置和max_independentset_col实现
+    Matrix matT = mat.transpose();
+    Matrix colBasis = max_independentset_col(matT);
+    return colBasis.transpose();
 }

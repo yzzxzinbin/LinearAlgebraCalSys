@@ -306,12 +306,12 @@ void TuiApp::handleSpecialKey(int key)
             drawInputPrompt();
         }
         break;
-    // case KEY_DELETE: // 如果 readChar 返回 KEY_DELETE
-    //     if (cursorPosition < currentInput.length()) {
-    //         currentInput.erase(cursorPosition, 1);
-    //         drawInputPrompt();
-    //     }
-    //     break;
+    case KEY_DELETE: // 如果 readChar 返回 KEY_DELETE
+        if (cursorPosition < currentInput.length()) {
+            currentInput.erase(cursorPosition, 1);
+            drawInputPrompt();
+        }
+        break;
     }
 }
 

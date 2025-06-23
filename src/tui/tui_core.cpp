@@ -56,6 +56,12 @@ void TuiApp::drawStatusBar()
     // 使用UTF-8视觉宽度计算来正确处理中文字符
     size_t statusVisualWidth = TuiUtils::calculateUtf8VisualWidth(status);
 
+    // 如果状态栏信息超过终端宽度，则截断
+    if (statusVisualWidth > static_cast<size_t>(terminalCols)) {
+        status = TuiUtils::trimToUtf8VisualWidth(status, terminalCols);
+        statusVisualWidth = TuiUtils::calculateUtf8VisualWidth(status); // 重新计算截断后的宽度
+    }
+
     // 添加右侧填充以确保占满整行
     if (statusVisualWidth < static_cast<size_t>(terminalCols))
     {

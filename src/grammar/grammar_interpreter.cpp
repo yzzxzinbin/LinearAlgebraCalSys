@@ -356,9 +356,9 @@ Variable Interpreter::executeFunctionCall(const FunctionCallNode* node) {
         } else {
             throw std::runtime_error("solveq函数需要一个矩阵参数(齐次Ax=0)或一个矩阵和一个矩阵/向量参数(非齐次Ax=b)");
         }
-    } else if (funcNameLower == "rs_rep_vecset") { // 新增：向量组线性表示关系
+    } else if (funcNameLower == "RS_rep_vecset") { // 新增：向量组线性表示关系
         if (args.size() != 2)
-            throw std::runtime_error("rs_rep_vecset函数需要两个参数（向量或矩阵）");
+            throw std::runtime_error("RS_rep_vecset函数需要两个参数（向量或矩阵）");
         // 支持向量（视为单列矩阵）
         Matrix m1 = (args[0].type == VariableType::VECTOR) ? Matrix(args[0].vectorValue.size(), 1) : args[0].matrixValue;
         if (args[0].type == VariableType::VECTOR)
@@ -367,7 +367,7 @@ Variable Interpreter::executeFunctionCall(const FunctionCallNode* node) {
         if (args[1].type == VariableType::VECTOR)
             for (size_t i = 0; i < args[1].vectorValue.size(); ++i) m2.at(i, 0) = args[1].vectorValue.at(i);
         // 修改：返回字符串类型Result
-        return Variable(Result::fromString(rep_vecset(m1, m2).getString()));
+        return Variable(Result::fromString(RS_rep_vecset(m1, m2).getString()));
     } else if (funcNameLower == "union_rref") { // 新增：同步rref变换
         if (args.size() != 2)
             throw std::runtime_error("unionrref函数需要两个参数（向量或矩阵）");
@@ -404,19 +404,18 @@ Variable Interpreter::executeFunctionCall(const FunctionCallNode* node) {
             if (v.at(i) != Fraction(0)) { allZero = false; break; }
         }
         if (allZero) throw std::runtime_error("rep_vecsingle函数第二个参数不能全为0向量");
-        // 求解 setA * x = v
-        Matrix b_col(v.size(), 1);
-        for (size_t i = 0; i < v.size(); ++i) b_col.at(i, 0) = v.at(i);
-        EquationSolver solver;
-        EquationSolution sol = solver.solve(setA, b_col);
-        if (!sol.hasSolution() || !sol.hasUniqueSolution()) {
-            // 返回全0列
-            Matrix zeroCol(setA.colCount(), 1);
-            return Variable(zeroCol);
-        } else {
-            // 返回系数列
-            return Variable(sol.getParticularSolution());
-        }
+        // 调用vecset_operation中的实现
+        return Variable(rep_vecsingle(setA, v));
+    } else if (funcNameLower == "max_independentset_col") {
+        // 参数1: 矩阵
+        if (args.size() != 1 || args[0].type != VariableType::MATRIX)
+            throw std::runtime_error("max_independentset_col函数需要一个矩阵参数");
+        return Variable(max_independentset_col(args[0].matrixValue));
+    } else if (funcNameLower == "max_independentset_row") {
+        // 参数1: 矩阵
+        if (args.size() != 1 || args[0].type != VariableType::MATRIX)
+            throw std::runtime_error("max_independentset_row函数需要一个矩阵参数");
+        return Variable(max_independentset_row(args[0].matrixValue));
     } else {
         throw std::runtime_error("未知函数: " + funcNameOriginal);
     }
