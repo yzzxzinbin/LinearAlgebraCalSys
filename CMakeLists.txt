@@ -26,10 +26,11 @@ file(GLOB_RECURSE APP_SOURCES
     "src/similar_matrix_operations.cpp"
     "src/vectorset_operation.cpp"
     "src/equationset.cpp" # 添加新文件
-
+    "src/algebra_operation.cpp"
 
     "src/main.cpp"
     
+    "src/algebra/*.cpp"
     "src/grammar/*.cpp"
     "src/tui/*.cpp"
     "src/utils/*.cpp"

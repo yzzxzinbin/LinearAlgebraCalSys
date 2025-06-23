@@ -24,6 +24,9 @@ public:
     Fraction(long long num);
     Fraction(long long num, long long den);
 
+    // 新增：从字符串构造
+    explicit Fraction(const std::string& s);
+
     // 获取分子和分母
     const BigInt& getNumerator() const;
     const BigInt& getDenominator() const;
@@ -57,5 +60,9 @@ public:
     // 新增：转换为字符串，用于更好的显示
     std::string toString() const;
 };
+
+// 新增：数学函数
+Fraction sqrt(const Fraction& f);
+bool is_perfect_square(const Fraction& f);
 
 #endif // FRACTION_H

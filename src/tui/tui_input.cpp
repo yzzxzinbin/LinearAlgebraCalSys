@@ -250,7 +250,7 @@ void TuiApp::handleInput()
             // non-suggestion-box keys need to work while box is visible.
             // However, up/down/enter/esc are handled by suggestion box.
             // Left/right should affect cursorPosition, then suggestions update.
-            if (key == KEY_LEFT || key == KEY_RIGHT) {
+            if (key == KEY_LEFT || key == KEY_RIGHT || key == KEY_DELETE) {
                  handleSpecialKey(key); // This will move cursor and call drawInputPrompt
             }
         }
