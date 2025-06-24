@@ -429,6 +429,10 @@ Monomial Polynomial::getMonomial() const {
     return terms[0];
 }
 
+const std::vector<Monomial>& Polynomial::getTerms() const {
+    return terms;
+}
+
 std::vector<Polynomial> Polynomial::perform_factorization() const {
     std::vector<Polynomial> factors;
     if (terms.empty()) return factors;
@@ -527,37 +531,6 @@ std::string Polynomial::factor() const {
         result = result.substr(0, result.length() - 3);
     }
     return result;
-}
-
-std::string Polynomial::solve() const {
-    if (getDegree() <= Fraction(0)) {
-        if (terms.empty() || terms[0].coefficient.getNumerator() != 0) return "无解";
-        return variable_name + " 可以是任意数";
-    }
-
-    auto factors = perform_factorization();
-    std::stringstream ss;
-    bool first_sol = true;
-
-    for (const auto& f : factors) {
-        if (f.getDegree() == Fraction(1)) {
-            Fraction a, b;
-            for(const auto& term : f.terms) {
-                if(term.power == Fraction(1)) a = term.coefficient;
-                else if(term.power == Fraction(0)) b = term.coefficient;
-            }
-            Fraction sol = -b / a;
-            if (!first_sol) ss << ", ";
-            ss << variable_name << " = " << sol.toString();
-            first_sol = false;
-        } else if (f.getDegree() > Fraction(0) && f.terms.size() == 1) {
-            if (!first_sol) ss << ", ";
-            ss << variable_name << " = 0";
-            first_sol = false;
-        }
-    }
-    if (first_sol) return "无法求解（或无有理数解）";
-    return ss.str();
 }
 
 } // namespace Algebra

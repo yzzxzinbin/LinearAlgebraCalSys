@@ -8,16 +8,14 @@ namespace Algebra {
 
 /**
  * @class Monomial
- * @brief 表示单项式，如 5x^2。
+ * @brief 表示单项式，如 3*x^2。
  */
-class Monomial {
-public:
+struct Monomial {
     Fraction coefficient;
     std::string variable;
-    Fraction power; // 指数已从 int 更改为 Fraction
+    Fraction power;
 
-    // 构造函数更新以接受 Fraction 类型的指数
-    Monomial(const Fraction& coeff = Fraction(0), std::string var = "", const Fraction& p = Fraction(0));
+    Monomial(const Fraction& coeff = 0, std::string var = "", const Fraction& p = 0);
 
     std::string toString() const;
 };

@@ -18,7 +18,6 @@ public:
 
     std::string toString() const;
     std::string factor() const;
-    std::string solve() const;
 
     Polynomial operator+(const Polynomial& other) const;
     Polynomial operator-(const Polynomial& other) const;
@@ -31,6 +30,8 @@ public:
     Fraction getDegree() const;
     size_t getTermCount() const;
     Monomial getMonomial() const;
+    const std::vector<Monomial>& getTerms() const;
+    std::vector<Polynomial> perform_factorization() const;
 
 private:
     std::vector<Monomial> terms;
@@ -39,7 +40,6 @@ private:
     void parse(std::string expression);
     void simplify();
 
-    std::vector<Polynomial> perform_factorization() const;
 };
 
 Polynomial pow(const Polynomial& base, int exp);

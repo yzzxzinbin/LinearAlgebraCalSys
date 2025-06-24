@@ -1,5 +1,6 @@
 #include "algebra_operation.h"
 #include "algebra/polynomial.h" // 包含新的多项式实现
+#include "algebra/equation.h"   // 新增包含
 
 namespace Algebra {
 
@@ -13,7 +14,7 @@ std::string factorExpression(const std::string& expr) {
 }
 
 std::string solveExpression(const std::string& expr) {
-    return Polynomial(expr).solve();
+    return Equation(expr).solve();
 }
 
 } // namespace Algebra
