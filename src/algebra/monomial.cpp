@@ -4,7 +4,7 @@
 
 namespace Algebra {
 
-Monomial::Monomial(const Fraction& coeff, std::string var, int p)
+Monomial::Monomial(const Fraction& coeff, std::string var, const Fraction& p)
     : coefficient(coeff), variable(std::move(var)), power(p) {}
 
 std::string Monomial::toString() const {
@@ -16,7 +16,7 @@ std::string Monomial::toString() const {
     bool coeff_is_one = (coefficient.getNumerator() == 1 && coefficient.getDenominator() == 1);
     bool coeff_is_neg_one = (coefficient.getNumerator() == -1 && coefficient.getDenominator() == 1);
 
-    if (power == 0) {
+    if (power == Fraction(0)) {
         return coefficient.toString();
     }
 
@@ -27,8 +27,13 @@ std::string Monomial::toString() const {
     }
 
     ss << variable;
-    if (power > 1) {
-        ss << "^" << power;
+    if (power != Fraction(1)) {
+        // 对于分数或负数指数，使用括号
+        if (power.getDenominator() != 1 || power < Fraction(0)) {
+            ss << "^(" << power.toString() << ")";
+        } else {
+            ss << "^" << power.toString();
+        }
     }
 
     return ss.str();

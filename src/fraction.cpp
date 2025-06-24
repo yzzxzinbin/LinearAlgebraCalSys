@@ -205,6 +205,26 @@ static bool is_perfect_square_bigint(const BigInt& n) {
     return root * root == n;
 }
 
+// 新增：分数幂运算
+Fraction pow(const Fraction& base, long long exp) {
+    if (exp == 0) {
+        return Fraction(1);
+    }
+    if (base.getNumerator() == 0 && exp < 0) {
+        throw std::runtime_error("Division by zero: 0 to a negative power.");
+    }
+
+    if (exp > 0) {
+        BigInt num = boost::multiprecision::pow(base.getNumerator(), static_cast<unsigned int>(exp));
+        BigInt den = boost::multiprecision::pow(base.getDenominator(), static_cast<unsigned int>(exp));
+        return Fraction(num, den);
+    } else { // exp < 0
+        BigInt num = boost::multiprecision::pow(base.getDenominator(), static_cast<unsigned int>(-exp));
+        BigInt den = boost::multiprecision::pow(base.getNumerator(), static_cast<unsigned int>(-exp));
+        return Fraction(num, den);
+    }
+}
+
 // 分数开方
 Fraction sqrt(const Fraction& f) {
     if (f.getNumerator() < 0) {

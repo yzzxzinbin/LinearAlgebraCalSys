@@ -10,6 +10,232 @@
 
 namespace Algebra {
 
+// 内部使用的递归下降解析器
+namespace {
+class ExpressionParser {
+public:
+    ExpressionParser(const std::string& text, std::string& var_name_ref)
+        : expression(text), pos(0), variable_name(var_name_ref) {}
+
+    Polynomial parse() {
+        if (expression.empty()) return Polynomial();
+        Polynomial result = parse_expression();
+        if (pos < expression.length()) {
+            throw std::runtime_error("Unexpected character encountered in input.");
+        }
+        return result;
+    }
+
+private:
+    std::string expression;
+    size_t pos;
+    std::string& variable_name;
+
+    char peek() {
+        skip_whitespace();
+        if (pos >= expression.length()) return '\0';
+        return expression[pos];
+    }
+
+    char get() {
+        skip_whitespace();
+        if (pos >= expression.length()) return '\0';
+        return expression[pos++];
+    }
+
+    void skip_whitespace() {
+        while (pos < expression.length() && isspace(expression[pos])) {
+            pos++;
+        }
+    }
+
+    Fraction parse_number() {
+        skip_whitespace();
+        size_t start_pos = pos; // For backtracking on error
+
+        std::string sign;
+        if (pos < expression.length() && (expression[pos] == '+' || expression[pos] == '-')) {
+            sign += expression[pos];
+            pos++;
+        }
+
+        skip_whitespace(); // Handle spaces like in "- 1"
+
+        size_t num_start = pos;
+        while (pos < expression.length() && (isdigit(expression[pos]) || expression[pos] == '/')) {
+            pos++;
+        }
+
+        if (pos == num_start) { // No digits were read
+            pos = start_pos; // backtrack
+            throw std::runtime_error("Invalid number format.");
+        }
+
+        std::string num_val = expression.substr(num_start, pos - num_start);
+        return Fraction(sign + num_val);
+    }
+
+    Fraction parse_exponent() {
+        skip_whitespace();
+        if (peek() == '(') {
+            get(); // consume '('
+            // 递归调用 parse_expression 来处理括号内的完整表达式
+            Polynomial exponent_poly = parse_expression();
+            if (peek() != ')') {
+                throw std::runtime_error("Mismatched parentheses in exponent.");
+            }
+            get(); // consume ')'
+            
+            // 指数必须是一个可以求值为常数的表达式
+            if (!exponent_poly.isConstant()) {
+                throw std::runtime_error("Exponent must evaluate to a constant value.");
+            }
+            return exponent_poly.getConstantValue();
+        } else {
+            // 对于没有括号的指数，只解析一个简单的数字
+            return parse_number();
+        }
+    }
+
+    Polynomial parse_expression() {
+        Polynomial result = parse_term();
+        while (peek() == '+' || peek() == '-') {
+            char op = get();
+            if (op == '+') {
+                result = result + parse_term();
+            } else {
+                result = result - parse_term();
+            }
+        }
+        return result;
+    }
+
+    Polynomial parse_term() {
+        Polynomial result = parse_factor();
+        while (peek() == '*') {
+            get(); // consume '*'
+            result = result * parse_factor();
+        }
+        return result;
+    }
+
+    Polynomial parse_factor() {
+        Polynomial result = parse_primary();
+        while (peek() == '^') {
+            get(); // consume '^'
+            Fraction exponent_frac = parse_exponent();
+
+            // If the base is a constant, we can handle fractional/negative exponents
+            if (result.isConstant()) {
+                if (result.isEmpty()) { // base is 0
+                    if (exponent_frac.getNumerator() <= 0) {
+                        throw std::runtime_error("0 cannot be raised to a non-positive power.");
+                    }
+                    // 0 to a positive power is 0, result is already correct (empty polynomial)
+                } else { // base is a non-zero constant
+                    Fraction base_val = result.getConstantValue();
+                    
+                    if (exponent_frac.getDenominator() != 1) {
+                        throw std::runtime_error("Fractional exponents on constants not yet fully supported.");
+                    }
+
+                    long long exponent;
+                    try {
+                        exponent = exponent_frac.getNumerator().convert_to<long long>();
+                    } catch (const std::overflow_error&) {
+                        throw std::runtime_error("Exponent is too large.");
+                    }
+                    
+                    Fraction new_coeff = pow(base_val, exponent); // Use Fraction::pow
+                    result = Polynomial(Monomial(new_coeff, "", 0));
+                }
+            } else { // Base is a variable polynomial
+                // If it's a multi-term polynomial, e.g., (x+1), we can only handle positive integer exponents.
+                if (result.getTermCount() > 1) {
+                    if (exponent_frac.getDenominator() != 1) {
+                        throw std::runtime_error("Fractional exponents on multi-term polynomials are not supported.");
+                    }
+                    long long exponent;
+                    try {
+                        exponent = exponent_frac.getNumerator().convert_to<long long>();
+                    } catch (const std::overflow_error&) {
+                        throw std::runtime_error("Exponent is too large.");
+                    }
+                    // This will call the function that throws on negative exponents.
+                    result = pow(result, static_cast<int>(exponent));
+                } else { // It's a single-term polynomial (a monomial)
+                    Monomial m = result.getMonomial();
+                    Fraction new_power = m.power * exponent_frac;
+                    Fraction new_coeff = m.coefficient; // Start with original coefficient
+
+                    if (m.coefficient != Fraction(1)) {
+                        // If coefficient is not 1, we need to raise it to the power too.
+                        // This is only generally possible for integer exponents.
+                        if (exponent_frac.getDenominator() != 1) {
+                            // Could add special cases like sqrt here if needed
+                            throw std::runtime_error("Fractional exponents on non-unit coefficients are not supported.");
+                        }
+                        long long exponent;
+                        try {
+                            exponent = exponent_frac.getNumerator().convert_to<long long>();
+                        } catch (const std::overflow_error&) {
+                            throw std::runtime_error("Exponent is too large.");
+                        }
+                        new_coeff = pow(m.coefficient, exponent);
+                    }
+                    // If coefficient is 1, it remains 1.
+                    
+                    result = Polynomial(Monomial(new_coeff, m.variable, new_power));
+                }
+            }
+        }
+        return result;
+    }
+
+    Polynomial parse_primary() {
+        char p = peek();
+        if (p == '(') {
+            get(); // consume '('
+            Polynomial result = parse_expression();
+            if (get() != ')') {
+                throw std::runtime_error("Mismatched parentheses.");
+            }
+            return result;
+        }
+        if (isdigit(p) || (p == '-' && isdigit(expression[pos+1]))) {
+            return Polynomial(Monomial(parse_number(), "", 0));
+        }
+        if (isalpha(p)) {
+            return parse_variable_term();
+        }
+        if (p == '+') { // Unary plus
+            get();
+            return parse_primary();
+        }
+        if (p == '-') { // Unary minus
+            get();
+            return Polynomial(Monomial(-1, "", 0)) * parse_primary();
+        }
+        throw std::runtime_error("Unexpected token in expression.");
+    }
+
+    Polynomial parse_variable_term() {
+        std::string var_name = std::string(1, get()); // Consumes only the variable name
+
+        if (variable_name.empty()) {
+            variable_name = var_name;
+        } else if (variable_name != var_name) {
+            throw std::runtime_error("Multi-variable polynomials not supported.");
+        }
+
+        // Exponent is always 1 here. It's handled by parse_factor.
+        return Polynomial(Monomial(Fraction(1), var_name, Fraction(1)));
+    }
+
+};
+} // anonymous namespace
+
+
 // Helper functions
 BigInt multi_gcd(const std::vector<BigInt>& numbers) {
     if (numbers.empty()) return 0;
@@ -33,72 +259,28 @@ BigInt multi_lcm(const std::vector<BigInt>& numbers) {
 Polynomial::Polynomial(const std::string& expression) : variable_name("") {
     if (!expression.empty()) {
         parse(expression);
-        simplify();
+    }
+}
+
+Polynomial::Polynomial(const Monomial& m) : variable_name(m.variable) {
+    if (m.coefficient.getNumerator() != 0) {
+        terms.push_back(m);
     }
 }
 
 void Polynomial::parse(std::string expr) {
-    expr.erase(std::remove_if(expr.begin(), expr.end(), ::isspace), expr.end());
-    if (expr.empty()) return;
-
-    for (size_t i = 1; i < expr.length(); ++i) {
-        if (expr[i] == '-' && expr[i-1] != '^') {
-            expr.replace(i, 1, "+-");
-            i++;
-        }
-    }
-
-    std::stringstream ss(expr);
-    std::string term_str;
-    while (std::getline(ss, term_str, '+')) {
-        if (term_str.empty()) continue;
-
-        size_t var_pos = term_str.find_first_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
-        
-        Fraction coeff(1);
-        std::string var_name = "";
-        int power = 0;
-
-        if (var_pos != std::string::npos) {
-            var_name = term_str.substr(var_pos, 1);
-            if (variable_name.empty()) variable_name = var_name;
-            else if (variable_name != var_name) throw std::runtime_error("Multi-variable polynomials not supported.");
-
-            size_t pow_pos = term_str.find('^');
-            power = (pow_pos != std::string::npos) ? std::stoi(term_str.substr(pow_pos + 1)) : 1;
-            
-            std::string coeff_str = term_str.substr(0, var_pos);
-            if (coeff_str.empty() || coeff_str == "+") {
-                coeff = 1;
-            } else if (coeff_str == "-") {
-                coeff = -1;
-            } else {
-                if (coeff_str.back() == '*') coeff_str.pop_back();
-                coeff = Fraction(coeff_str);
-            }
-        } else {
-            coeff = Fraction(term_str);
-            power = 0;
-        }
-        
-        if (coeff.getNumerator() != 0) {
-            terms.emplace_back(coeff, var_name, power);
-        }
-    }
-    if (variable_name.empty()) {
-        for(const auto& term : terms) {
-            if(term.power > 0) {
-                variable_name = term.variable;
-                break;
-            }
-        }
-    }
+    // 使用新的解析器
+    ExpressionParser parser(expr, this->variable_name);
+    Polynomial result = parser.parse();
+    this->terms = result.terms;
+    // variable_name is already set by reference in the parser
+    simplify();
 }
 
 void Polynomial::simplify() {
     if (terms.empty()) return;
 
-    std::map<int, Fraction> power_to_coeff;
+    std::map<Fraction, Fraction> power_to_coeff; // 键类型从 int 更改为 Fraction
     std::string var;
     for (const auto& term : terms) {
         if (!term.variable.empty()) {
@@ -117,6 +299,57 @@ void Polynomial::simplify() {
     std::sort(terms.begin(), terms.end(), [](const Monomial& a, const Monomial& b) {
         return a.power > b.power;
     });
+}
+
+Polynomial Polynomial::operator+(const Polynomial& other) const {
+    Polynomial result = *this;
+    for (const auto& term : other.terms) {
+        result.terms.push_back(term);
+    }
+    if (result.variable_name.empty()) result.variable_name = other.variable_name;
+    result.simplify();
+    return result;
+}
+
+Polynomial Polynomial::operator-(const Polynomial& other) const {
+    Polynomial result = *this;
+    for (const auto& term : other.terms) {
+        result.terms.emplace_back(-term.coefficient, term.variable, term.power);
+    }
+    if (result.variable_name.empty()) result.variable_name = other.variable_name;
+    result.simplify();
+    return result;
+}
+
+Polynomial Polynomial::operator*(const Polynomial& other) const {
+    Polynomial result;
+    if (this->variable_name.empty() && !other.variable_name.empty()) {
+        result.variable_name = other.variable_name;
+    } else {
+        result.variable_name = this->variable_name;
+    }
+
+    for (const auto& t1 : this->terms) {
+        for (const auto& t2 : other.terms) {
+            result.terms.emplace_back(
+                t1.coefficient * t2.coefficient,
+                result.variable_name,
+                t1.power + t2.power
+            );
+        }
+    }
+    result.simplify();
+    return result;
+}
+
+Polynomial pow(const Polynomial& base, int exp) {
+    if (exp < 0) throw std::runtime_error("Negative exponents on polynomials not supported.");
+    if (exp == 0) return Polynomial("1");
+    Polynomial result = base;
+    for (int i = 1; i < exp; ++i) {
+        result = result * base;
+    }
+    return result;
 }
 
 std::string Polynomial::toString() const {
@@ -141,23 +374,59 @@ std::string Polynomial::toString() const {
         
         bool coeff_is_one = (c.getNumerator() == 1 && c.getDenominator() == 1);
         
-        if (!coeff_is_one || term.power == 0) {
+        if (!coeff_is_one || term.power == Fraction(0)) {
             ss << c.toString();
         }
         
-        if (term.power > 0) {
+        if (term.power != Fraction(0)) {
             if (!coeff_is_one && !ss.str().empty() && ss.str().back() != '-') ss << "*";
             ss << term.variable;
-            if (term.power > 1) ss << "^" << term.power;
+            if (term.power != Fraction(1)) {
+                if (term.power.getDenominator() != 1 || term.power < Fraction(0)) {
+                    ss << "^(" << term.power.toString() << ")";
+                } else {
+                    ss << "^" << term.power.toString();
+                }
+            }
         }
         first = false;
     }
     return ss.str();
 }
 
-int Polynomial::getDegree() const {
-    if (terms.empty()) return -1;
+// 新增：公有查询方法的实现
+bool Polynomial::isConstant() const {
+    return getDegree() <= Fraction(0);
+}
+
+bool Polynomial::isEmpty() const {
+    return terms.empty();
+}
+
+Fraction Polynomial::getConstantValue() const {
+    if (!isConstant()) {
+        throw std::logic_error("Polynomial is not a constant.");
+    }
+    if (isEmpty()) {
+        return Fraction(0);
+    }
+    return terms[0].coefficient;
+}
+
+Fraction Polynomial::getDegree() const {
+    if (terms.empty()) return Fraction(-1);
     return terms.front().power;
+}
+
+size_t Polynomial::getTermCount() const {
+    return terms.size();
+}
+
+Monomial Polynomial::getMonomial() const {
+    if (terms.size() != 1) {
+        throw std::logic_error("Polynomial is not a monomial.");
+    }
+    return terms[0];
 }
 
 std::vector<Polynomial> Polynomial::perform_factorization() const {
@@ -175,9 +444,9 @@ std::vector<Polynomial> Polynomial::perform_factorization() const {
     BigInt den_lcm = multi_lcm(dens);
     Fraction common_coeff(num_gcd, den_lcm);
 
-    int min_power = current_poly.terms.empty() ? 0 : current_poly.terms.back().power;
+    Fraction min_power = current_poly.terms.empty() ? Fraction(0) : current_poly.terms.back().power;
 
-    if (common_coeff.getNumerator() != 1 || common_coeff.getDenominator() != 1 || min_power > 0) {
+    if (common_coeff.getNumerator() != 1 || common_coeff.getDenominator() != 1 || min_power > Fraction(0)) {
         Polynomial common_factor;
         if (common_coeff.getNumerator() != 0) {
              common_factor.terms.emplace_back(common_coeff, variable_name, min_power);
@@ -192,12 +461,12 @@ std::vector<Polynomial> Polynomial::perform_factorization() const {
         current_poly = remaining_poly;
     }
 
-    if (current_poly.getDegree() == 2) {
+    if (current_poly.getDegree() == Fraction(2)) {
         Fraction a, b, c;
         for(const auto& term : current_poly.terms) {
-            if(term.power == 2) a = term.coefficient;
-            else if(term.power == 1) b = term.coefficient;
-            else if(term.power == 0) c = term.coefficient;
+            if(term.power == Fraction(2)) a = term.coefficient;
+            else if(term.power == Fraction(1)) b = term.coefficient;
+            else if(term.power == Fraction(0)) c = term.coefficient;
         }
         
         Fraction discriminant = b*b - Fraction(4)*a*c;
@@ -207,17 +476,17 @@ std::vector<Polynomial> Polynomial::perform_factorization() const {
             Fraction r2 = (-b - sqrt_d) / (Fraction(2)*a);
 
             Polynomial factor_a;
-            factor_a.terms.emplace_back(a, "", 0);
+            factor_a.terms.emplace_back(a, "", Fraction(0));
             factors.push_back(factor_a);
 
             Polynomial factor1;
-            factor1.terms.emplace_back(1, variable_name, 1);
-            factor1.terms.emplace_back(-r1, "", 0);
+            factor1.terms.emplace_back(Fraction(1), variable_name, Fraction(1));
+            factor1.terms.emplace_back(-r1, "", Fraction(0));
             factors.push_back(factor1);
 
             Polynomial factor2;
-            factor2.terms.emplace_back(1, variable_name, 1);
-            factor2.terms.emplace_back(-r2, "", 0);
+            factor2.terms.emplace_back(Fraction(1), variable_name, Fraction(1));
+            factor2.terms.emplace_back(-r2, "", Fraction(0));
             factors.push_back(factor2);
             
             return factors;
@@ -231,16 +500,16 @@ std::vector<Polynomial> Polynomial::perform_factorization() const {
 }
 
 std::string Polynomial::factor() const {
-    if (getDegree() <= 0) return toString();
+    if (getDegree() <= Fraction(0)) return toString();
 
     auto factors = perform_factorization();
     std::stringstream ss;
     for (size_t i = 0; i < factors.size(); ++i) {
         const auto& f = factors[i];
         if (f.terms.empty()) continue;
-        if (f.terms.size() == 1 && f.terms[0].power == 0 && f.terms[0].coefficient == Fraction(1)) continue;
+        if (f.terms.size() == 1 && f.terms[0].power == Fraction(0) && f.terms[0].coefficient == Fraction(1)) continue;
 
-        bool needs_paren = (f.getDegree() > 0 && f.terms.size() > 1);
+        bool needs_paren = (f.getDegree() > Fraction(0) && f.terms.size() > 1);
         if (needs_paren) ss << "(";
         ss << f.toString();
         if (needs_paren) ss << ")";
@@ -248,7 +517,7 @@ std::string Polynomial::factor() const {
         if (i < factors.size() - 1) {
             const auto& next_f = factors[i+1];
             if (next_f.terms.empty()) continue;
-            if (next_f.terms.size() == 1 && next_f.terms[0].power == 0 && next_f.terms[0].coefficient == Fraction(1)) continue;
+            if (next_f.terms.size() == 1 && next_f.terms[0].power == Fraction(0) && next_f.terms[0].coefficient == Fraction(1)) continue;
             ss << " * ";
         }
     }
@@ -261,7 +530,7 @@ std::string Polynomial::factor() const {
 }
 
 std::string Polynomial::solve() const {
-    if (getDegree() <= 0) {
+    if (getDegree() <= Fraction(0)) {
         if (terms.empty() || terms[0].coefficient.getNumerator() != 0) return "无解";
         return variable_name + " 可以是任意数";
     }
@@ -271,17 +540,17 @@ std::string Polynomial::solve() const {
     bool first_sol = true;
 
     for (const auto& f : factors) {
-        if (f.getDegree() == 1) {
+        if (f.getDegree() == Fraction(1)) {
             Fraction a, b;
             for(const auto& term : f.terms) {
-                if(term.power == 1) a = term.coefficient;
-                else if(term.power == 0) b = term.coefficient;
+                if(term.power == Fraction(1)) a = term.coefficient;
+                else if(term.power == Fraction(0)) b = term.coefficient;
             }
             Fraction sol = -b / a;
             if (!first_sol) ss << ", ";
             ss << variable_name << " = " << sol.toString();
             first_sol = false;
-        } else if (f.getDegree() > 0 && f.terms.size() == 1) {
+        } else if (f.getDegree() > Fraction(0) && f.terms.size() == 1) {
             if (!first_sol) ss << ", ";
             ss << variable_name << " = 0";
             first_sol = false;

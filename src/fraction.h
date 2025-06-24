@@ -62,6 +62,7 @@ public:
 };
 
 // 新增：数学函数
+Fraction pow(const Fraction& base, long long exp);
 Fraction sqrt(const Fraction& f);
 bool is_perfect_square(const Fraction& f);
 

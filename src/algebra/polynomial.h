@@ -14,10 +14,23 @@ namespace Algebra {
 class Polynomial {
 public:
     explicit Polynomial(const std::string& expression = "");
+    explicit Polynomial(const Monomial& m);
 
     std::string toString() const;
     std::string factor() const;
     std::string solve() const;
+
+    Polynomial operator+(const Polynomial& other) const;
+    Polynomial operator-(const Polynomial& other) const;
+    Polynomial operator*(const Polynomial& other) const;
+
+    // 新增：公有查询方法
+    bool isConstant() const;
+    bool isEmpty() const;
+    Fraction getConstantValue() const; // 如果不是常量则抛出异常
+    Fraction getDegree() const;
+    size_t getTermCount() const;
+    Monomial getMonomial() const;
 
 private:
     std::vector<Monomial> terms;
@@ -25,10 +38,11 @@ private:
 
     void parse(std::string expression);
     void simplify();
-    int getDegree() const;
 
     std::vector<Polynomial> perform_factorization() const;
 };
+
+Polynomial pow(const Polynomial& base, int exp);
 
 } // namespace Algebra
 

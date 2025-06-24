@@ -120,9 +120,9 @@ void EnhancedHelpViewer::initializeHelpContent() {
         }
     });
 
-    // 第2页：变量定义
+    // 第2页：变量操作
     helpPages.push_back({
-        "变量定义",
+        "变量操作",
         {
             {"\033[1;36m矩阵定义\033[22m", 
              "使用方括号和分号定义矩阵。\n\n"
@@ -150,14 +150,7 @@ void EnhancedHelpViewer::initializeHelpContent() {
              "\033[2m示例:\033[0m\n"
              "\033[1;33m> result = m1 * m2\n> sum_vec = v1 + v2\n> det_val = det(m1)\033[0m\n"
              "\033[36m[效果: 变量可由表达式赋值]\033[0m"
-            }
-        }
-    });
-
-    // 第3页：基本运算
-    helpPages.push_back({
-        "基本运算",
-        {
+            },
             {"\033[1;36m矩阵运算\033[22m", 
              "矩阵支持加减乘运算。\n\n"
              "\033[1m运算符:\033[0m\n"
@@ -200,7 +193,7 @@ void EnhancedHelpViewer::initializeHelpContent() {
         }
     });
 
-    // 第4页：矩阵函数
+    // 第3页：矩阵函数
     helpPages.push_back({
         "矩阵函数",
         {
@@ -211,14 +204,23 @@ void EnhancedHelpViewer::initializeHelpContent() {
              "\033[1;33m> mt = transpose(m1)\033[0m\n"
              "\033[36m[效果: mt 为 m1 的转置矩阵]\033[0m"
             },
+            // 拆分 det
             {"\033[1;36mdet()\033[22m", 
-             "计算方阵的行列式。\n\n"
-             "\033[1m用法:\033[0m\n"
-             "- det(matrix): 默认算法\n"
-             "- det_expansion(matrix): 按行列展开\n"
+             "计算方阵的行列式（高斯消元法）。\n\n"
+             "\033[1m用法:\033[0m det(matrix)\n"
+             "\033[1m说明:\033[0m 适用于任意阶方阵，内部采用高斯消元法，速度快，支持分数精度。\n"
              "\n\033[2m示例:\033[0m\n"
-             "\033[1;33m> d = det(m1)\n> d2 = det_expansion(m1)\033[0m\n"
+             "\033[1;33m> d = det(m1)\033[0m\n"
              "\033[36m[效果: 结果为分数型行列式值]\033[0m"
+            },
+            // 新增 det_expansion
+            {"\033[1;36mdet_expansion()\033[22m", 
+             "按行列展开法计算方阵的行列式。\n\n"
+             "\033[1m用法:\033[0m det_expansion(matrix)\n"
+             "\033[1m说明:\033[0m 适用于小型方阵（如3阶及以下），可显示详细展开步骤。\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> d2 = det_expansion(m1)\033[0m\n"
+             "\033[36m[效果: 结果为分数型行列式值，支持详细步骤显示]\033[0m"
             },
             {"\033[1;36minverse()\033[22m", 
              "计算方阵的逆矩阵。\n\n"
@@ -236,14 +238,23 @@ void EnhancedHelpViewer::initializeHelpContent() {
              "\033[1;33m> r = rank(m1)\033[0m\n"
              "\033[36m[效果: r 为秩的整数值]\033[0m"
             },
-            {"\033[1;36mref()/rref()\033[22m", 
-             "行阶梯形和最简行阶梯形。\n\n"
-             "\033[1m用法:\033[0m\n"
-             "- ref(matrix): 行阶梯形\n"
-             "- rref(matrix): 最简行阶梯形\n"
+            // 拆分 ref
+            {"\033[1;36mref()\033[22m", 
+             "化简为行阶梯形（高斯消元法）。\n\n"
+             "\033[1m用法:\033[0m ref(matrix)\n"
+             "\033[1m说明:\033[0m 只进行前向消元，主元下方全为0，主元不一定为1。\n"
              "\n\033[2m示例:\033[0m\n"
-             "\033[1;33m> ref_form = ref(m1)\n> rref_form = rref(m1)\033[0m\n"
-             "\033[36m[效果: 结果为化简后的矩阵]\033[0m"
+             "\033[1;33m> ref_form = ref(m1)\033[0m\n"
+             "\033[36m[效果: 结果为行阶梯形矩阵]\033[0m"
+            },
+            // 拆分 rref
+            {"\033[1;36mrref()\033[22m", 
+             "化简为最简行阶梯形（高斯-若尔当消元法）。\n\n"
+             "\033[1m用法:\033[0m rref(matrix)\n"
+             "\033[1m说明:\033[0m 主元为1，主元所在列其他元素全为0。\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> rref_form = rref(m1)\033[0m\n"
+             "\033[36m[效果: 结果为最简行阶梯形矩阵]\033[0m"
             },
             {"\033[1;36mcofactor_matrix()\033[22m", 
              "计算代数余子式矩阵。\n\n"
@@ -262,7 +273,7 @@ void EnhancedHelpViewer::initializeHelpContent() {
         }
     });
 
-    // 第5页：高级功能
+    // 第4页：高级功能
     helpPages.push_back({
         "高级功能",
         {
@@ -343,7 +354,7 @@ void EnhancedHelpViewer::initializeHelpContent() {
         }
     });
 
-    // 第6页：文件操作
+    // 第5页：文件操作
     helpPages.push_back({
         "文件操作",
         {
@@ -381,7 +392,7 @@ void EnhancedHelpViewer::initializeHelpContent() {
         }
     });
 
-    // 第7页：代数运算
+    // 第6页：代数运算
     helpPages.push_back({
         "代数运算",
         {
@@ -586,7 +597,7 @@ void EnhancedHelpViewer::drawDetailView() {
         std::cout << lines[i];
     }
 }
-
+ 
 void EnhancedHelpViewer::updateDimensions(int termRows, int termCols) {
     this->terminalRows = termRows;
     this->terminalCols = termCols;

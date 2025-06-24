@@ -14,9 +14,10 @@ class Monomial {
 public:
     Fraction coefficient;
     std::string variable;
-    int power;
+    Fraction power; // 指数已从 int 更改为 Fraction
 
-    Monomial(const Fraction& coeff = Fraction(0), std::string var = "", int p = 0);
+    // 构造函数更新以接受 Fraction 类型的指数
+    Monomial(const Fraction& coeff = Fraction(0), std::string var = "", const Fraction& p = Fraction(0));
 
     std::string toString() const;
 };
