@@ -138,10 +138,20 @@ std::unique_ptr<AstNode> Parser::term() {
 std::unique_ptr<AstNode> Parser::factor() {
     auto expr = primary();
     
-    while (match(TokenType::MULTIPLY) || match(TokenType::DIVIDE) || match(TokenType::CROSS_PRODUCT)) { // 添加对 CROSS_PRODUCT 的匹配
-        TokenType op = previous().type;
-        auto right = primary();
-        expr = std::make_unique<BinaryOpNode>(op, std::move(expr), std::move(right));
+    while (true) {
+        if (match(TokenType::MULTIPLY)) {
+            auto right = primary();
+            expr = std::make_unique<BinaryOpNode>(TokenType::MULTIPLY, std::move(expr), std::move(right));
+        } else if (match(TokenType::DIVIDE)) {
+            auto right = primary();
+            expr = std::make_unique<BinaryOpNode>(TokenType::DIVIDE, std::move(expr), std::move(right));
+        } else if (check(TokenType::IDENTIFIER) && peek().value == "x") {
+            advance(); // consume 'x'
+            auto right = primary();
+            expr = std::make_unique<BinaryOpNode>(TokenType::CROSS_PRODUCT, std::move(expr), std::move(right));
+        } else {
+            break;
+        }
     }
     
     return expr;
@@ -228,6 +238,43 @@ std::unique_ptr<AstNode> Parser::primary() {
 }
 
 std::unique_ptr<AstNode> Parser::functionCall(const std::string& name) {
+    // 检查是否是代数函数
+    std::string nameLower = name;
+    std::transform(nameLower.begin(), nameLower.end(), nameLower.begin(),
+                   [](unsigned char c){ return std::tolower(c); });
+
+    if (nameLower == "alg_simplify" || nameLower == "alg_factor" || nameLower == "alg_solve") {
+        std::stringstream expression_ss;
+        int paren_balance = 1; // 我们已经匹配了'('
+
+        while (!isAtEnd() && paren_balance > 0) {
+            Token current_token = peek();
+            if (current_token.type == TokenType::LEFT_PAREN) {
+                paren_balance++;
+            } else if (current_token.type == TokenType::RIGHT_PAREN) {
+                paren_balance--;
+            }
+
+            if (paren_balance > 0) {
+                if (!expression_ss.str().empty()) {
+                    expression_ss << " ";
+                }
+                expression_ss << current_token.value;
+                advance();
+            }
+        }
+
+        if (paren_balance != 0) {
+            throw std::runtime_error("代数函数调用中的括号不匹配。");
+        }
+        
+        consume(TokenType::RIGHT_PAREN, "函数调用缺少右括号')'");
+
+        auto func_node = std::make_unique<FunctionCallNode>(name);
+        func_node->arguments.push_back(std::make_unique<AlgebraicExpressionNode>(expression_ss.str()));
+        return func_node;
+    }
+
     auto node = std::make_unique<FunctionCallNode>(name);
     
     // 如果没有参数，直接返回

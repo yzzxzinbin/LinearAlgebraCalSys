@@ -17,6 +17,7 @@ enum class TokenType {
     DIVIDE,         // /
     CROSS_PRODUCT,  // x (用于向量叉乘)
     ASSIGN,         // =
+    POWER,          // ^ (新增)
     
     // 分隔符
     LEFT_BRACKET,   // [

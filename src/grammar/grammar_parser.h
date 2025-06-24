@@ -13,7 +13,8 @@ enum class AstNodeType {
     UNARY_OP,       // 一元运算
     FUNCTION_CALL,  // 函数调用
     ASSIGNMENT,     // 赋值语句
-    COMMAND         // 系统命令
+    COMMAND,        // 系统命令
+    ALGEBRAIC_EXPRESSION // 新增：代数表达式，作为某些函数的特殊参数
 };
 
 // 抽象语法树节点
@@ -78,6 +79,15 @@ public:
     std::vector<std::string> arguments;
     
     CommandNode(const std::string& command) : AstNode(AstNodeType::COMMAND), command(command) {}
+};
+
+// 新增：代数表达式节点
+class AlgebraicExpressionNode : public AstNode {
+public:
+    std::string expression;
+
+    AlgebraicExpressionNode(const std::string& expr)
+        : AstNode(AstNodeType::ALGEBRAIC_EXPRESSION), expression(expr) {}
 };
 
 // 语法解析器

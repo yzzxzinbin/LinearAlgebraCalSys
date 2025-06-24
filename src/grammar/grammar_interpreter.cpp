@@ -6,6 +6,7 @@
 #include <cctype>
 #include <fstream> // 用于文件操作
 #include "../utils/logger.h" // 用于日志记录
+#include "../algebra_operation.h" // 新增：代数运算
 #include "../similar_matrix_operations.h" // 新增包含
 #include "../tui/tui_app.h" // 新增包含以访问 TuiApp::KNOWN_COMMANDS
 #include "../vectorset_operation.h" // 新增包含
@@ -170,25 +171,49 @@ Variable Interpreter::executeBinaryOp(const BinaryOpNode* node) {
 }
 
 Variable Interpreter::executeFunctionCall(const FunctionCallNode* node) {
+    std::string funcNameOriginal = node->name;
+    std::string funcNameLower = funcNameOriginal;
+    std::transform(funcNameLower.begin(), funcNameLower.end(), funcNameLower.begin(), 
+                   [](unsigned char c){ return std::tolower(c); });
+
+    // 为代数函数提供特殊处理
+    if (funcNameLower == "alg_simplify" || funcNameLower == "alg_factor" || funcNameLower == "alg_solve") {
+        if (node->arguments.size() != 1) {
+            throw std::runtime_error("代数函数 " + funcNameOriginal + " 需要一个参数。");
+        }
+        const auto* argNode = node->arguments[0].get();
+        if (argNode->type != AstNodeType::ALGEBRAIC_EXPRESSION) {
+            throw std::runtime_error("代数函数 " + funcNameOriginal + " 的参数类型错误。");
+        }
+        const auto* algExpr = static_cast<const AlgebraicExpressionNode*>(argNode);
+        const std::string& expression = algExpr->expression;
+
+        try {
+            std::string result_str;
+            if (funcNameLower == "alg_simplify") {
+                result_str = Algebra::simplifyExpression(expression);
+            } else if (funcNameLower == "alg_factor") {
+                result_str = Algebra::factorExpression(expression);
+            } else { // alg_solve
+                result_str = Algebra::solveExpression(expression);
+            }
+            return Variable(Result(result_str));
+        } catch (const std::exception& e) {
+            throw std::runtime_error("代数运算失败: " + std::string(e.what()));
+        }
+    }
+
     // 获取参数
     std::vector<Variable> args;
     for (const auto& argNode : node->arguments) {
         args.push_back(execute(argNode)); // 注意：这里递归调用execute，它会调用clearCurrentHistories
                                           // 这可能导致嵌套函数调用的历史记录被清除。
                                           // 顶层的 execute 清除历史，这里的 execute 是为了参数求值，不应清除。
-                                          // 为了解决这个问题，execute(AstNode) 应该只在顶层调用时清除历史。
-                                          // 或者，参数求值不应调用顶层 execute，而是特定的求值函数。
-                                          // 暂时，我们假设参数求值不会触发新的历史记录清除，因为它们不是顶层命令。
-                                          // 一个更安全的做法是，execute 的重载版本，一个给TuiApp，一个内部用。
+                                          // 为了解决这个问题，execute 的重载版本，一个给TuiApp，一个内部用。
                                           // 或者，execute 接受一个 isTopLevel 调用标志。
                                           // 目前，由于参数通常是变量或字面量，它们不会调用executeFunctionCall，所以暂时安全。
     }
     
-    std::string funcNameOriginal = node->name;
-    std::string funcNameLower = funcNameOriginal;
-    std::transform(funcNameLower.begin(), funcNameLower.end(), funcNameLower.begin(), 
-                   [](unsigned char c){ return std::tolower(c); });
-
     // 如果启用了步骤显示，尝试使用带历史记录的版本
     if (showSteps) {
         if (funcNameLower == "det" && args.size() == 1 && args[0].type == VariableType::MATRIX) {
@@ -537,4 +562,3 @@ Variable Interpreter::divide(const Variable& left, const Variable& right) {
     
     throw std::runtime_error("不支持的除法操作");
 }
-
