@@ -1,5 +1,6 @@
 #include "polynomial.h"
 #include "../fraction.h"
+#include "radical.h"
 #include <stdexcept>
 #include <sstream>
 #include <algorithm>
@@ -90,7 +91,14 @@ private:
             if (!exponent_poly.isConstant()) {
                 throw std::runtime_error("Exponent must evaluate to a constant value.");
             }
-            return exponent_poly.getConstantValue();
+            
+            // 获取常数值并检查是否为有理数
+            SimplifiedRadical exponent_value = exponent_poly.getConstantValue();
+            if (!exponent_value.isRational()) {
+                throw std::runtime_error("Exponent must be a rational number, not a radical.");
+            }
+            
+            return exponent_value.getRationalValue();
         } else {
             // 对于没有括号的指数，只解析一个简单的数字
             return parse_number();
@@ -133,20 +141,11 @@ private:
                     }
                     // 0 to a positive power is 0, result is already correct (empty polynomial)
                 } else { // base is a non-zero constant
-                    Fraction base_val = result.getConstantValue();
-                    
-                    if (exponent_frac.getDenominator() != 1) {
-                        throw std::runtime_error("Fractional exponents on constants not yet fully supported.");
+                    SimplifiedRadical base_val = result.getConstantValue();
+                    if (!base_val.isRational()) {
+                        throw std::runtime_error("Raising a radical to a power is not supported yet.");
                     }
-
-                    long long exponent;
-                    try {
-                        exponent = exponent_frac.getNumerator().convert_to<long long>();
-                    } catch (const std::overflow_error&) {
-                        throw std::runtime_error("Exponent is too large.");
-                    }
-                    
-                    Fraction new_coeff = pow(base_val, exponent); // Use Fraction::pow
+                    SimplifiedRadical new_coeff = pow_frac(base_val.getRationalValue(), exponent_frac);
                     result = Polynomial(Monomial(new_coeff, "", 0));
                 }
             } else { // Base is a variable polynomial
@@ -166,9 +165,9 @@ private:
                 } else { // It's a single-term polynomial (a monomial)
                     Monomial m = result.getMonomial();
                     Fraction new_power = m.power * exponent_frac;
-                    Fraction new_coeff = m.coefficient; // Start with original coefficient
+                    SimplifiedRadical new_coeff = m.coefficient; // Start with original coefficient
 
-                    if (m.coefficient != Fraction(1)) {
+                    if (m.coefficient != SimplifiedRadical(Fraction(1))) {
                         // If coefficient is not 1, we need to raise it to the power too.
                         // This is only generally possible for integer exponents.
                         if (exponent_frac.getDenominator() != 1) {
@@ -214,7 +213,7 @@ private:
         }
         if (p == '-') { // Unary minus
             get();
-            return Polynomial(Monomial(-1, "", 0)) * parse_primary();
+            return Polynomial(Monomial(Fraction(-1), "", 0)) * parse_primary();
         }
         throw std::runtime_error("Unexpected token in expression.");
     }
@@ -263,7 +262,7 @@ Polynomial::Polynomial(const std::string& expression) : variable_name("") {
 }
 
 Polynomial::Polynomial(const Monomial& m) : variable_name(m.variable) {
-    if (m.coefficient.getNumerator() != 0) {
+    if (!m.coefficient.isZero()) {
         terms.push_back(m);
     }
 }
@@ -280,21 +279,36 @@ void Polynomial::parse(std::string expr) {
 void Polynomial::simplify() {
     if (terms.empty()) return;
 
-    std::map<Fraction, Fraction> power_to_coeff; // 键类型从 int 更改为 Fraction
+    std::map<Fraction, std::vector<SimplifiedRadical>> power_to_coeffs;
     std::string var;
     for (const auto& term : terms) {
         if (!term.variable.empty()) {
             var = term.variable;
         }
-        power_to_coeff[term.power] += term.coefficient;
+        power_to_coeffs[term.power].push_back(term.coefficient);
     }
 
     terms.clear();
-    for (const auto& pair : power_to_coeff) {
-        if (pair.second.getNumerator() != 0) {
-            terms.emplace_back(pair.second, var, pair.first);
+    for (auto& pair : power_to_coeffs) {
+        Fraction power = pair.first;
+        auto& coeffs = pair.second;
+
+        std::map<Fraction, Fraction> combined_coeffs; // radicand -> total_coeff
+        for (const auto& coeff : coeffs) {
+            if (!coeff.isZero()) {
+                 combined_coeffs[coeff.radicand] += coeff.coefficient;
+            }
+        }
+
+        for (const auto& final_coeff_pair : combined_coeffs) {
+            Fraction radicand = final_coeff_pair.first;
+            Fraction coeff_part = final_coeff_pair.second;
+            if (coeff_part.getNumerator() != 0) {
+                terms.emplace_back(SimplifiedRadical{coeff_part, radicand}, var, power);
+            }
         }
     }
+
 
     std::sort(terms.begin(), terms.end(), [](const Monomial& a, const Monomial& b) {
         return a.power > b.power;
@@ -358,21 +372,21 @@ std::string Polynomial::toString() const {
     std::stringstream ss;
     bool first = true;
     for (const auto& term : terms) {
-        Fraction c = term.coefficient;
+        SimplifiedRadical c = term.coefficient;
         
         if (!first) {
-            if (c.getNumerator() > 0) {
+            if (c.coefficient.getNumerator() > 0) {
                 ss << " + ";
             } else {
                 ss << " - ";
                 c = -c;
             }
-        } else if (c.getNumerator() < 0) {
+        } else if (c.coefficient.getNumerator() < 0) {
             ss << "-";
             c = -c;
         }
         
-        bool coeff_is_one = (c.getNumerator() == 1 && c.getDenominator() == 1);
+        bool coeff_is_one = c.isRational() && c.coefficient == Fraction(1);
         
         if (!coeff_is_one || term.power == Fraction(0)) {
             ss << c.toString();
@@ -403,14 +417,23 @@ bool Polynomial::isEmpty() const {
     return terms.empty();
 }
 
-Fraction Polynomial::getConstantValue() const {
+SimplifiedRadical Polynomial::getConstantValue() const {
     if (!isConstant()) {
         throw std::logic_error("Polynomial is not a constant.");
     }
     if (isEmpty()) {
-        return Fraction(0);
+        return SimplifiedRadical(Fraction(0));
     }
     return terms[0].coefficient;
+}
+
+bool Polynomial::hasOnlyRationalCoefficients() const {
+    for (const auto& term : terms) {
+        if (!term.coefficient.isRational()) {
+            return false;
+        }
+    }
+    return true;
 }
 
 Fraction Polynomial::getDegree() const {
@@ -434,6 +457,9 @@ const std::vector<Monomial>& Polynomial::getTerms() const {
 }
 
 std::vector<Polynomial> Polynomial::perform_factorization() const {
+    if (!hasOnlyRationalCoefficients()) {
+        throw std::runtime_error("Factorization of polynomials with radical coefficients is not supported.");
+    }
     std::vector<Polynomial> factors;
     if (terms.empty()) return factors;
 
@@ -441,8 +467,8 @@ std::vector<Polynomial> Polynomial::perform_factorization() const {
 
     std::vector<BigInt> nums, dens;
     for(const auto& term : current_poly.terms) {
-        nums.push_back(abs(term.coefficient.getNumerator()));
-        dens.push_back(term.coefficient.getDenominator());
+        nums.push_back(abs(term.coefficient.coefficient.getNumerator()));
+        dens.push_back(term.coefficient.coefficient.getDenominator());
     }
     BigInt num_gcd = multi_gcd(nums);
     BigInt den_lcm = multi_lcm(dens);
@@ -459,7 +485,7 @@ std::vector<Polynomial> Polynomial::perform_factorization() const {
 
         Polynomial remaining_poly;
         for (const auto& term : current_poly.terms) {
-            remaining_poly.terms.emplace_back(term.coefficient / common_coeff, variable_name, term.power - min_power);
+            remaining_poly.terms.emplace_back(term.coefficient.coefficient / common_coeff, variable_name, term.power - min_power);
         }
         remaining_poly.simplify();
         current_poly = remaining_poly;
@@ -468,9 +494,9 @@ std::vector<Polynomial> Polynomial::perform_factorization() const {
     if (current_poly.getDegree() == Fraction(2)) {
         Fraction a, b, c;
         for(const auto& term : current_poly.terms) {
-            if(term.power == Fraction(2)) a = term.coefficient;
-            else if(term.power == Fraction(1)) b = term.coefficient;
-            else if(term.power == Fraction(0)) c = term.coefficient;
+            if(term.power == Fraction(2)) a = term.coefficient.coefficient;
+            else if(term.power == Fraction(1)) b = term.coefficient.coefficient;
+            else if(term.power == Fraction(0)) c = term.coefficient.coefficient;
         }
         
         Fraction discriminant = b*b - Fraction(4)*a*c;
@@ -504,6 +530,9 @@ std::vector<Polynomial> Polynomial::perform_factorization() const {
 }
 
 std::string Polynomial::factor() const {
+    if (!hasOnlyRationalCoefficients()) {
+        return toString() + " (factorization with radicals not supported)";
+    }
     if (getDegree() <= Fraction(0)) return toString();
 
     auto factors = perform_factorization();
@@ -531,6 +560,5 @@ std::string Polynomial::factor() const {
         result = result.substr(0, result.length() - 3);
     }
     return result;
+ }
 }
-
-} // namespace Algebra

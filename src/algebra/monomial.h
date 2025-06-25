@@ -2,6 +2,7 @@
 #define ALGEBRA_MONOMIAL_H
 
 #include "../fraction.h"
+#include "radical.h"
 #include <string>
 
 namespace Algebra {
@@ -11,11 +12,13 @@ namespace Algebra {
  * @brief 表示单项式，如 3*x^2。
  */
 struct Monomial {
-    Fraction coefficient;
+    SimplifiedRadical coefficient;
     std::string variable;
     Fraction power;
 
-    Monomial(const Fraction& coeff = 0, std::string var = "", const Fraction& p = 0);
+    Monomial(const SimplifiedRadical& coeff = {}, std::string var = "", const Fraction& p = 0);
+    Monomial(const Fraction& coeff, std::string var = "", const Fraction& p = 0);
+
 
     std::string toString() const;
 };

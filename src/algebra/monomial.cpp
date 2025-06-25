@@ -4,25 +4,27 @@
 
 namespace Algebra {
 
-Monomial::Monomial(const Fraction& coeff, std::string var, const Fraction& p)
+Monomial::Monomial(const SimplifiedRadical& coeff, std::string var, const Fraction& p)
     : coefficient(coeff), variable(std::move(var)), power(p) {}
 
+Monomial::Monomial(const Fraction& coeff, std::string var, const Fraction& p)
+    : coefficient(SimplifiedRadical(coeff)), variable(std::move(var)), power(p) {}
+
+
 std::string Monomial::toString() const {
-    if (coefficient.getNumerator() == 0) {
+    if (coefficient.isZero()) {
         return "0";
     }
 
     std::stringstream ss;
-    bool coeff_is_one = (coefficient.getNumerator() == 1 && coefficient.getDenominator() == 1);
-    bool coeff_is_neg_one = (coefficient.getNumerator() == -1 && coefficient.getDenominator() == 1);
 
     if (power == Fraction(0)) {
         return coefficient.toString();
     }
 
-    if (coeff_is_neg_one) {
+    if (coefficient.toString() == "-1") {
         ss << "-";
-    } else if (!coeff_is_one) {
+    } else if (coefficient.toString() != "1") {
         ss << coefficient.toString() << "*";
     }
 

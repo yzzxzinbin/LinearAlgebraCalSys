@@ -41,8 +41,11 @@ void Equation::parse(const std::string& expr) {
 }
 
 std::string Equation::solve() {
+    if (!poly_form.hasOnlyRationalCoefficients()) {
+        return "Equation solving with radical coefficients is not supported.";
+    }
     if (poly_form.getDegree() <= Fraction(0)) {
-        if (poly_form.isEmpty() || poly_form.getConstantValue().getNumerator() == 0) {
+        if (poly_form.isEmpty() || poly_form.getConstantValue().coefficient.getNumerator() == 0) {
             // 0 = 0
             return variable_name.empty() ? "恒等式成立" : (variable_name + " 可以是任意数");
         } else {
@@ -67,8 +70,8 @@ std::string Equation::solve_linear() {
     // ax + b = 0
     Fraction a, b(0);
     for(const auto& term : poly_form.getTerms()) {
-        if(term.power == Fraction(1)) a = term.coefficient;
-        else if(term.power == Fraction(0)) b = term.coefficient;
+        if(term.power == Fraction(1)) a = term.coefficient.getRationalValue();
+        else if(term.power == Fraction(0)) b = term.coefficient.getRationalValue();
     }
     Fraction sol = -b / a;
     return variable_name + " = " + sol.toString();
@@ -78,9 +81,9 @@ std::string Equation::solve_quadratic() {
     // ax^2 + bx + c = 0
     Fraction a, b(0), c(0);
     for(const auto& term : poly_form.getTerms()) {
-        if(term.power == Fraction(2)) a = term.coefficient;
-        else if(term.power == Fraction(1)) b = term.coefficient;
-        else if(term.power == Fraction(0)) c = term.coefficient;
+        if(term.power == Fraction(2)) a = term.coefficient.getRationalValue();
+        else if(term.power == Fraction(1)) b = term.coefficient.getRationalValue();
+        else if(term.power == Fraction(0)) c = term.coefficient.getRationalValue();
     }
 
     Fraction discriminant = b*b - Fraction(4)*a*c;
@@ -137,8 +140,8 @@ std::string Equation::solve_by_factoring() {
         if (f.getDegree() == Fraction(1)) {
             Fraction a, b(0);
             for(const auto& term : f.getTerms()) {
-                if(term.power == Fraction(1)) a = term.coefficient;
-                else if(term.power == Fraction(0)) b = term.coefficient;
+                if(term.power == Fraction(1)) a = term.coefficient.getRationalValue();
+                else if(term.power == Fraction(0)) b = term.coefficient.getRationalValue();
             }
             Fraction sol = -b / a;
             if (!first_sol) ss << ", ";

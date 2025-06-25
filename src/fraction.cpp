@@ -1,6 +1,7 @@
 #include "fraction.h"
 #include <stdexcept>
 #include <sstream>
+#include <boost/multiprecision/integer.hpp>
 
 // 计算最大公约数的函数，适用于 cpp_int
 BigInt gcd(const BigInt& a, const BigInt& b) {
@@ -13,6 +14,40 @@ BigInt gcd(const BigInt& a, const BigInt& b) {
         abs_a = temp;
     }
     return abs_a;
+}
+
+// 新增：自定义的整数n次方根函数
+// 返回 floor(n^(1/r))
+static BigInt integer_nth_root(const BigInt& n, unsigned int r) {
+    if (n < 0) {
+        throw std::runtime_error("Nth root of a negative number is not supported in this context.");
+    }
+    if (n == 0) return 0;
+    if (r == 1) return n;
+    if (r == 0) throw std::runtime_error("Cannot compute 0th root.");
+
+    BigInt low = 1;
+    BigInt high = n;
+    BigInt root = 1;
+
+    while (low <= high) {
+        BigInt mid = low + (high - low) / 2;
+        if (mid == 0) { // Should not happen if low starts at 1
+            break;
+        }
+        
+        BigInt p = boost::multiprecision::pow(mid, r);
+
+        if (p > n) {
+            high = mid - 1;
+        } else if (p < n) {
+            root = mid;
+            low = mid + 1;
+        } else { // p == n
+            return mid;
+        }
+    }
+    return root;
 }
 
 void Fraction::simplify() {

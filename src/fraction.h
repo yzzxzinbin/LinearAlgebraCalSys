@@ -67,3 +67,4 @@ Fraction sqrt(const Fraction& f);
 bool is_perfect_square(const Fraction& f);
 
 #endif // FRACTION_H
+

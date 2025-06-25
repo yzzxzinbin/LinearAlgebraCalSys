@@ -26,7 +26,8 @@ public:
     // 新增：公有查询方法
     bool isConstant() const;
     bool isEmpty() const;
-    Fraction getConstantValue() const; // 如果不是常量则抛出异常
+    SimplifiedRadical getConstantValue() const; // 如果不是常量则抛出异常
+    bool hasOnlyRationalCoefficients() const;
     Fraction getDegree() const;
     size_t getTermCount() const;
     Monomial getMonomial() const;
