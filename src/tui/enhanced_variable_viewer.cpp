@@ -223,20 +223,25 @@ void EnhancedVariableViewer::drawVariableList() {
     Terminal::setForeground(Color::WHITE);
     Terminal::setBackgroundRGB(45,63,118); // 深蓝色背景
     std::string prompt = "筛选: ";
-    std::cout << prompt << filterInput;
+    std::string inputText = prompt + filterInput;
+    size_t maxInputVisualWidth = listWidth - 1;
+    std::string displayInput = inputText;
+    size_t inputVisualWidth = TuiUtils::calculateUtf8VisualWidth(inputText);
+
+    if (inputVisualWidth > maxInputVisualWidth) {
+        displayInput = TuiUtils::trimToUtf8VisualWidth(inputText, maxInputVisualWidth);
+        inputVisualWidth = TuiUtils::calculateUtf8VisualWidth(displayInput);
+    }
+
+    std::cout << displayInput;
     // 光标模拟
     Terminal::setBackground(Color::WHITE);
     std::cout << " "; // 光标块
     Terminal::resetColor();
     // 补齐空格到列表宽度
-    size_t inputWidth = TuiUtils::calculateUtf8VisualWidth(prompt + filterInput) -1;
-    if (inputWidth < static_cast<size_t>(listWidth - 2)) {
+    if (inputVisualWidth < maxInputVisualWidth) {
         Terminal::setBackgroundRGB(45,63,118); // 深蓝色背景
-        std::cout << std::string(listWidth - 2 - inputWidth, ' ');
-    } else {
-        // 如果输入过长，截断
-        std::string truncatedInput = TuiUtils::trimToUtf8VisualWidth(prompt + filterInput, listWidth - 2);
-        std::cout << truncatedInput;
+        std::cout << std::string(maxInputVisualWidth - inputVisualWidth, ' ');
     }
     Terminal::resetColor();
 

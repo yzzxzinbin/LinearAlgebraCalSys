@@ -54,6 +54,13 @@ void signal_handler(int signo)
 
 int main()
 {
+    // 控制台标题设置
+#ifdef _WIN32
+    SetConsoleTitleA("LACSv1.3");
+#else
+    std::cout << "\033]0;LACSv1.3\007"; // 设置Linux终端标题
+#endif
+
     std::string initialCommandToRun = "";
     try
     {
