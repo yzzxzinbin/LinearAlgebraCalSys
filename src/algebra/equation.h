@@ -3,6 +3,7 @@
 
 #include "polynomial.h"
 #include <string>
+#include <vector>
 
 namespace Algebra {
 
@@ -18,8 +19,8 @@ private:
 
     void parse(const std::string& expr);
     std::string solve_linear();
-    std::string solve_quadratic();
-    std::string solve_by_factoring();
+    std::vector<std::string> solve_quadratic_all();
+    std::vector<std::string> solve_by_factoring_all();
 };
 
 } // namespace Algebra

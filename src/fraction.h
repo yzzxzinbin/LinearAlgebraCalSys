@@ -66,5 +66,9 @@ Fraction pow(const Fraction& base, long long exp);
 Fraction sqrt(const Fraction& f);
 bool is_perfect_square(const Fraction& f);
 
+// 新增：n次方根相关函数
+Fraction nth_root(const Fraction& f, long long n);
+bool is_perfect_nth_root(const Fraction& f, long long n);
+
 #endif // FRACTION_H
 

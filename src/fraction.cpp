@@ -276,3 +276,34 @@ bool is_perfect_square(const Fraction& f) {
     if (f.getNumerator() < 0) return false;
     return is_perfect_square_bigint(f.getNumerator()) && is_perfect_square_bigint(f.getDenominator());
 }
+
+// 新增：n次方根
+Fraction nth_root(const Fraction& f, long long n) {
+    if (f.getNumerator() < 0 && n % 2 == 0) {
+        throw std::runtime_error("Cannot compute even root of a negative number.");
+    }
+    if (!is_perfect_nth_root(f, n)) {
+        throw std::runtime_error("Result of nth root is not a rational number.");
+    }
+    
+    BigInt num_root = integer_nth_root(abs(f.getNumerator()), n);
+    BigInt den_root = integer_nth_root(f.getDenominator(), n);
+    
+    // 处理负数的奇次根
+    if (f.getNumerator() < 0 && n % 2 == 1) {
+        num_root = -num_root;
+    }
+    
+    return Fraction(num_root, den_root);
+}
+
+// 检查分数是否为完美n次方数
+bool is_perfect_nth_root(const Fraction& f, long long n) {
+    if (f.getNumerator() < 0 && n % 2 == 0) return false;
+    
+    BigInt num_root = integer_nth_root(abs(f.getNumerator()), n);
+    BigInt den_root = integer_nth_root(f.getDenominator(), n);
+    
+    return boost::multiprecision::pow(num_root, n) == abs(f.getNumerator()) &&
+           boost::multiprecision::pow(den_root, n) == f.getDenominator();
+}

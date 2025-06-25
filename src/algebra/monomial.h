@@ -9,7 +9,7 @@ namespace Algebra {
 
 /**
  * @class Monomial
- * @brief 表示单项式，如 3*x^2。
+ * @brief 表示单项式，如 3*sqrt(2)*x^2。
  */
 struct Monomial {
     SimplifiedRadical coefficient;
@@ -19,9 +19,14 @@ struct Monomial {
     Monomial(const SimplifiedRadical& coeff = {}, std::string var = "", const Fraction& p = 0);
     Monomial(const Fraction& coeff, std::string var = "", const Fraction& p = 0);
 
-
     std::string toString() const;
 };
+
+// 新增：运算符重载
+Monomial operator+(const Monomial& a, const Monomial& b);
+Monomial operator-(const Monomial& a);
+Monomial operator*(const Monomial& a, const Monomial& b);
+bool operator==(const Monomial& a, const Monomial& b);
 
 } // namespace Algebra
 

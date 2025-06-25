@@ -6,6 +6,19 @@
 
 namespace Algebra {
 
+// 下标数字映射辅助函数
+static std::string to_subscript(int n) {
+    static const char* subs[] = {"₀","₁","₂","₃","₄","₅","₆","₇","₈","₉"};
+    std::string result;
+    if (n == 0) return subs[0];
+    while (n > 0) {
+        int digit = n % 10;
+        result = subs[digit] + result;
+        n /= 10;
+    }
+    return result;
+}
+
 Equation::Equation(const std::string& expr) {
     parse(expr);
 }
@@ -55,106 +68,125 @@ std::string Equation::solve() {
     }
 
     if (poly_form.getDegree() == Fraction(1)) {
-        return solve_linear();
+        std::vector<std::string> sols = {solve_linear()};
+        // 统一下标输出
+        std::stringstream ss;
+        for (size_t i = 0; i < sols.size(); ++i) {
+            if (i > 0) ss << ", ";
+            ss << variable_name << to_subscript(i + 1) << " = " << sols[i];
+        }
+        return ss.str();
     }
 
     if (poly_form.getDegree() == Fraction(2)) {
-        return solve_quadratic();
+        std::vector<std::string> sols = solve_quadratic_all();
+        std::stringstream ss;
+        for (size_t i = 0; i < sols.size(); ++i) {
+            if (i > 0) ss << ", ";
+            ss << variable_name << to_subscript(i + 1) << " = " << sols[i];
+        }
+        return ss.str();
     }
 
     // 对于更高次，尝试因式分解
-    return solve_by_factoring();
+    std::vector<std::string> sols = solve_by_factoring_all();
+    if (sols.empty()) return "无法求解（或无有理数解）";
+    std::stringstream ss;
+    for (size_t i = 0; i < sols.size(); ++i) {
+        if (i > 0) ss << ", ";
+        ss << variable_name << to_subscript(i + 1) << " = " << sols[i];
+    }
+    return ss.str();
 }
 
+// 保留原有的单解接口供内部调用
 std::string Equation::solve_linear() {
     // ax + b = 0
-    Fraction a, b(0);
+    SimplifiedRadical a, b(Fraction(0));
     for(const auto& term : poly_form.getTerms()) {
-        if(term.power == Fraction(1)) a = term.coefficient.getRationalValue();
-        else if(term.power == Fraction(0)) b = term.coefficient.getRationalValue();
+        if(term.power == Fraction(1)) a = term.coefficient;
+        else if(term.power == Fraction(0)) b = term.coefficient;
     }
-    Fraction sol = -b / a;
+    
+    if (!a.isRational() || !b.isRational()) {
+        return "Linear equation solving with radical coefficients is not fully supported.";
+    }
+    
+    Fraction sol = -b.getRationalValue() / a.getRationalValue();
     return variable_name + " = " + sol.toString();
 }
 
-std::string Equation::solve_quadratic() {
+// 返回所有解的字符串（二次方程只有一个解）
+std::vector<std::string> Equation::solve_quadratic_all() {
     // ax^2 + bx + c = 0
-    Fraction a, b(0), c(0);
+    SimplifiedRadical a, b(Fraction(0)), c(Fraction(0));
     for(const auto& term : poly_form.getTerms()) {
-        if(term.power == Fraction(2)) a = term.coefficient.getRationalValue();
-        else if(term.power == Fraction(1)) b = term.coefficient.getRationalValue();
-        else if(term.power == Fraction(0)) c = term.coefficient.getRationalValue();
+        if(term.power == Fraction(2)) a = term.coefficient;
+        else if(term.power == Fraction(1)) b = term.coefficient;
+        else if(term.power == Fraction(0)) c = term.coefficient;
     }
 
-    Fraction discriminant = b*b - Fraction(4)*a*c;
+    if (!a.isRational() || !b.isRational() || !c.isRational()) {
+        return { "Quadratic equation solving with radical coefficients is not fully supported." };
+    }
+
+    Fraction a_rat = a.getRationalValue();
+    Fraction b_rat = b.getRationalValue();
+    Fraction c_rat = c.getRationalValue();
+    
+    Fraction discriminant = b_rat*b_rat - Fraction(4)*a_rat*c_rat;
 
     if (is_perfect_square(discriminant)) {
         Fraction sqrt_d = sqrt(discriminant);
-        Fraction r1 = (-b + sqrt_d) / (Fraction(2)*a);
-        Fraction r2 = (-b - sqrt_d) / (Fraction(2)*a);
+        Fraction r1 = (-b_rat + sqrt_d) / (Fraction(2)*a_rat);
+        Fraction r2 = (-b_rat - sqrt_d) / (Fraction(2)*a_rat);
         if (r1 == r2) {
-            return variable_name + " = " + r1.toString();
+            return { r1.toString() };
         }
-        return variable_name + " = " + r1.toString() + ", " + variable_name + " = " + r2.toString();
+        return { r1.toString(), r2.toString() };
     } else {
-        // 处理无理数解
-        std::stringstream ss;
-        Fraction two_a = Fraction(2) * a;
-        Fraction neg_b_over_2a = -b / two_a;
+        // 处理无理数解，使用任意阶根式
+        Fraction two_a = Fraction(2) * a_rat;
+        Fraction neg_b_over_2a = -b_rat / two_a;
 
         SimplifiedRadical sqrt_d_simplified = simplify_sqrt(discriminant);
         sqrt_d_simplified.coefficient = sqrt_d_simplified.coefficient / two_a;
 
-        // 解1: -b/2a + sqrt(D)/2a
-        ss << variable_name << " = ";
+        std::string s1, s2;
         if (neg_b_over_2a.getNumerator() != 0) {
-            ss << neg_b_over_2a.toString();
             if (sqrt_d_simplified.coefficient.getNumerator() > 0) {
-                ss << " + ";
+                s1 = neg_b_over_2a.toString() + " + " + sqrt_d_simplified.toString();
+                s2 = neg_b_over_2a.toString() + " - " + sqrt_d_simplified.toString();
             } else {
-                ss << " - ";
-                sqrt_d_simplified.coefficient = -sqrt_d_simplified.coefficient;
+                s1 = neg_b_over_2a.toString() + " - " + (-sqrt_d_simplified).toString();
+                s2 = neg_b_over_2a.toString() + " + " + (-sqrt_d_simplified).toString();
             }
-        }
-        ss << sqrt_d_simplified.toString();
-
-        // 解2: -b/2a - sqrt(D)/2a
-        ss << ", " << variable_name << " = ";
-        if (neg_b_over_2a.getNumerator() != 0) {
-            ss << neg_b_over_2a.toString() << " - ";
         } else {
-            ss << "-";
+            s1 = sqrt_d_simplified.toString();
+            s2 = "-" + sqrt_d_simplified.toString();
         }
-        ss << sqrt_d_simplified.toString();
-        
-        return ss.str();
+        return { s1, s2 };
     }
 }
 
-std::string Equation::solve_by_factoring() {
+// 返回所有解的字符串（因式分解法）
+std::vector<std::string> Equation::solve_by_factoring_all() {
     auto factors = poly_form.perform_factorization();
-    std::stringstream ss;
-    bool first_sol = true;
-
+    std::vector<std::string> sols;
     for (const auto& f : factors) {
-        if (f.getDegree() == Fraction(1)) {
+        if (f.getDegree() == Fraction(1) && f.hasOnlyRationalCoefficients()) {
             Fraction a, b(0);
             for(const auto& term : f.getTerms()) {
                 if(term.power == Fraction(1)) a = term.coefficient.getRationalValue();
                 else if(term.power == Fraction(0)) b = term.coefficient.getRationalValue();
             }
             Fraction sol = -b / a;
-            if (!first_sol) ss << ", ";
-            ss << variable_name << " = " << sol.toString();
-            first_sol = false;
+            sols.push_back(sol.toString());
         } else if (f.getDegree() > Fraction(0) && f.getTermCount() == 1) {
-            if (!first_sol) ss << ", ";
-            ss << variable_name << " = 0";
-            first_sol = false;
+            sols.push_back("0");
         }
     }
-    if (first_sol) return "无法求解（或无有理数解）";
-    return ss.str();
+    return sols;
 }
 
 } // namespace Algebra

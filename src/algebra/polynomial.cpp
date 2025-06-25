@@ -293,22 +293,24 @@ void Polynomial::simplify() {
         Fraction power = pair.first;
         auto& coeffs = pair.second;
 
-        std::map<Fraction, Fraction> combined_coeffs; // radicand -> total_coeff
+        // 按根式的 (radicand, degree) 分组合并同类项
+        std::map<std::pair<Fraction, Fraction>, Fraction> combined_coeffs;
         for (const auto& coeff : coeffs) {
             if (!coeff.isZero()) {
-                 combined_coeffs[coeff.radicand] += coeff.coefficient;
+                auto key = std::make_pair(coeff.radicand, coeff.degree);
+                combined_coeffs[key] += coeff.coefficient;
             }
         }
 
         for (const auto& final_coeff_pair : combined_coeffs) {
-            Fraction radicand = final_coeff_pair.first;
+            auto key = final_coeff_pair.first;
             Fraction coeff_part = final_coeff_pair.second;
             if (coeff_part.getNumerator() != 0) {
-                terms.emplace_back(SimplifiedRadical{coeff_part, radicand}, var, power);
+                SimplifiedRadical simplified_coeff(coeff_part, key.first, key.second);
+                terms.emplace_back(simplified_coeff, var, power);
             }
         }
     }
-
 
     std::sort(terms.begin(), terms.end(), [](const Monomial& a, const Monomial& b) {
         return a.power > b.power;
@@ -465,38 +467,51 @@ std::vector<Polynomial> Polynomial::perform_factorization() const {
 
     Polynomial current_poly = *this;
 
+    // 提取公因子（只处理有理系数）
     std::vector<BigInt> nums, dens;
     for(const auto& term : current_poly.terms) {
-        nums.push_back(abs(term.coefficient.coefficient.getNumerator()));
-        dens.push_back(term.coefficient.coefficient.getDenominator());
-    }
-    BigInt num_gcd = multi_gcd(nums);
-    BigInt den_lcm = multi_lcm(dens);
-    Fraction common_coeff(num_gcd, den_lcm);
-
-    Fraction min_power = current_poly.terms.empty() ? Fraction(0) : current_poly.terms.back().power;
-
-    if (common_coeff.getNumerator() != 1 || common_coeff.getDenominator() != 1 || min_power > Fraction(0)) {
-        Polynomial common_factor;
-        if (common_coeff.getNumerator() != 0) {
-             common_factor.terms.emplace_back(common_coeff, variable_name, min_power);
-             factors.push_back(common_factor);
+        if (term.coefficient.isRational()) {
+            nums.push_back(abs(term.coefficient.coefficient.getNumerator()));
+            dens.push_back(term.coefficient.coefficient.getDenominator());
         }
+    }
+    
+    if (!nums.empty()) {
+        BigInt num_gcd = multi_gcd(nums);
+        BigInt den_lcm = multi_lcm(dens);
+        Fraction common_coeff(num_gcd, den_lcm);
 
-        Polynomial remaining_poly;
-        for (const auto& term : current_poly.terms) {
-            remaining_poly.terms.emplace_back(term.coefficient.coefficient / common_coeff, variable_name, term.power - min_power);
+        Fraction min_power = current_poly.terms.empty() ? Fraction(0) : current_poly.terms.back().power;
+
+        if (common_coeff.getNumerator() != 1 || common_coeff.getDenominator() != 1 || min_power > Fraction(0)) {
+            Polynomial common_factor;
+            if (common_coeff.getNumerator() != 0) {
+                common_factor.terms.emplace_back(SimplifiedRadical(common_coeff), variable_name, min_power);
+                factors.push_back(common_factor);
+            }
+
+            Polynomial remaining_poly;
+            for (const auto& term : current_poly.terms) {
+                if (term.coefficient.isRational()) {
+                    SimplifiedRadical new_coeff(term.coefficient.coefficient / common_coeff);
+                    remaining_poly.terms.emplace_back(new_coeff, variable_name, term.power - min_power);
+                } else {
+                    // 对于无理系数，保持原样
+                    remaining_poly.terms.emplace_back(term.coefficient, variable_name, term.power - min_power);
+                }
+            }
+            remaining_poly.simplify();
+            current_poly = remaining_poly;
         }
-        remaining_poly.simplify();
-        current_poly = remaining_poly;
     }
 
-    if (current_poly.getDegree() == Fraction(2)) {
+    // 二次方程因式分解（只处理有理系数）
+    if (current_poly.getDegree() == Fraction(2) && current_poly.hasOnlyRationalCoefficients()) {
         Fraction a, b, c;
         for(const auto& term : current_poly.terms) {
-            if(term.power == Fraction(2)) a = term.coefficient.coefficient;
-            else if(term.power == Fraction(1)) b = term.coefficient.coefficient;
-            else if(term.power == Fraction(0)) c = term.coefficient.coefficient;
+            if(term.power == Fraction(2)) a = term.coefficient.getRationalValue();
+            else if(term.power == Fraction(1)) b = term.coefficient.getRationalValue();
+            else if(term.power == Fraction(0)) c = term.coefficient.getRationalValue();
         }
         
         Fraction discriminant = b*b - Fraction(4)*a*c;
@@ -506,17 +521,17 @@ std::vector<Polynomial> Polynomial::perform_factorization() const {
             Fraction r2 = (-b - sqrt_d) / (Fraction(2)*a);
 
             Polynomial factor_a;
-            factor_a.terms.emplace_back(a, "", Fraction(0));
+            factor_a.terms.emplace_back(SimplifiedRadical(a), "", Fraction(0));
             factors.push_back(factor_a);
 
             Polynomial factor1;
-            factor1.terms.emplace_back(Fraction(1), variable_name, Fraction(1));
-            factor1.terms.emplace_back(-r1, "", Fraction(0));
+            factor1.terms.emplace_back(SimplifiedRadical(Fraction(1)), variable_name, Fraction(1));
+            factor1.terms.emplace_back(SimplifiedRadical(-r1), "", Fraction(0));
             factors.push_back(factor1);
 
             Polynomial factor2;
-            factor2.terms.emplace_back(Fraction(1), variable_name, Fraction(1));
-            factor2.terms.emplace_back(-r2, "", Fraction(0));
+            factor2.terms.emplace_back(SimplifiedRadical(Fraction(1)), variable_name, Fraction(1));
+            factor2.terms.emplace_back(SimplifiedRadical(-r2), "", Fraction(0));
             factors.push_back(factor2);
             
             return factors;
