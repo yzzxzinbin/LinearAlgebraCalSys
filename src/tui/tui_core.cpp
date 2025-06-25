@@ -12,7 +12,7 @@ void TuiApp::drawHeader()
     Terminal::setForeground(Color::CYAN);
     Terminal::setBackground(Color::BLUE);
 
-    std::string title = "线性代数计算系统 v1.2";
+    std::string title = "线性代数计算系统 v1.3";
     
     // 使用UTF-8视觉宽度计算来正确处理中文字符
     size_t titleVisualWidth = TuiUtils::calculateUtf8VisualWidth(title);
