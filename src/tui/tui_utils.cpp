@@ -39,8 +39,21 @@ std::string TuiApp::variableToString(const Variable& var) {
         case VariableType::RESULT: // Assuming Result has an operator<< or a toString method
             ss << var.resultValue;
             break;
+        case VariableType::EQUATION_SOLUTION:
+            ss << var.equationSolutionValue.getDetailedDescription(); 
     }
     return ss.str();
+}
+
+std::string variableTypeString(const VariableType& type) {
+    switch (type) {
+        case VariableType::FRACTION: return "FRACTION";
+        case VariableType::VECTOR: return "VECTOR";
+        case VariableType::MATRIX: return "MATRIX";
+        case VariableType::RESULT: return "RESULT";
+        case VariableType::EQUATION_SOLUTION: return "EQUATION_SOLUTION";
+        default: return "UNKNOWN";
+    }
 }
 
 std::vector<std::string> TuiApp::getVariableNames() const {

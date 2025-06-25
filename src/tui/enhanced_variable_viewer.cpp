@@ -1,5 +1,6 @@
 #include "enhanced_variable_viewer.h"
 #include "../utils/tui_utils.h"
+#include "./tui_app.h"
 #include <algorithm>
 #include <iostream>
 #include <sstream>
@@ -7,12 +8,11 @@
 
 EnhancedVariableViewer::EnhancedVariableViewer(const Interpreter& interp, int termRows, int termCols)
     : currentSelection(0), scrollOffset(0), terminalRows(termRows), terminalCols(termCols), 
-      interpreter(interp) {
-    
+      interpreter(interp), filterInput("") {
     std::iostream::sync_with_stdio(false);
     refreshVariableList();
     updateLayout();
-    updateStatus("变量预览器:上下键选择变量，ESC退出");
+    updateStatus("变量预览器: ↑↓选择变量, 输入过滤, ESC退出");
 }
 
 EnhancedVariableViewer::~EnhancedVariableViewer() {
@@ -22,7 +22,7 @@ EnhancedVariableViewer::~EnhancedVariableViewer() {
 void EnhancedVariableViewer::refreshVariableList() {
     variableList.clear();
     const auto& vars = interpreter.getVariables();
-    
+
     for (const auto& pair : vars) {
         VariableItem item;
         item.name = pair.first;
@@ -31,13 +31,45 @@ void EnhancedVariableViewer::refreshVariableList() {
         item.sizeInfo = getSizeInfo(pair.second);
         variableList.push_back(item);
     }
-    
-    // 确保选择索引有效
-    if (currentSelection >= variableList.size() && !variableList.empty()) {
-        currentSelection = variableList.size() - 1;
+    updateFilter(); // 新增：刷新过滤后的列表
+}
+
+void EnhancedVariableViewer::updateFilter() {
+    filteredVariableList.clear();
+    if (filterInput.empty()) {
+        filteredVariableList = variableList;
+    } else if (filterInput.size() > 3 && filterInput[0] == '<' && filterInput[1] == '!' && filterInput.back() == '>') {
+        // 类型过滤：如 <!MATRIX>
+        std::string typeName = filterInput.substr(2, filterInput.size() - 3);
+        // 转大写
+        std::transform(typeName.begin(), typeName.end(), typeName.begin(), ::toupper);
+        for (const auto& item : variableList) {
+            std::string itemType;
+            itemType = variableTypeString(item.type);
+            if (itemType == typeName) {
+                filteredVariableList.push_back(item);
+            }
+        }
+    } else {
+        std::string filterLower = filterInput;
+        std::transform(filterLower.begin(), filterLower.end(), filterLower.begin(), ::tolower);
+        for (const auto& item : variableList) {
+            std::string nameLower = item.name;
+            std::transform(nameLower.begin(), nameLower.end(), nameLower.begin(), ::tolower);
+            if (nameLower.find(filterLower) != std::string::npos) {
+                filteredVariableList.push_back(item);
+            }
+        }
     }
-    if (variableList.empty()) {
+    // 修正 currentSelection 和 scrollOffset
+    if (currentSelection >= filteredVariableList.size() && !filteredVariableList.empty()) {
+        currentSelection = filteredVariableList.size() - 1;
+    }
+    if (filteredVariableList.empty()) {
         currentSelection = 0;
+        scrollOffset = 0;
+    } else {
+        updateScrolling();
     }
 }
 
@@ -101,6 +133,25 @@ void EnhancedVariableViewer::clearScreen() {
 }
 
 EnhancedVariableViewer::ViewerResult EnhancedVariableViewer::handleInput(int key) {
+    // 处理输入框相关按键
+    if (key == KEY_BACKSPACE || key == KEY_DELETE) {
+        if (!filterInput.empty()) {
+            filterInput.pop_back();
+            updateFilter();
+            currentSelection = 0;
+            scrollOffset = 0;
+        }
+        return ViewerResult::CONTINUE;
+    }
+    // 仅允许输入可打印字符
+    if (key >= 32 && key <= 126) {
+        filterInput += static_cast<char>(key);
+        updateFilter();
+        currentSelection = 0;
+        scrollOffset = 0;
+        return ViewerResult::CONTINUE;
+    }
+    // 方向键和ESC
     switch (key) {
         case KEY_UP:
             if (currentSelection > 0) {
@@ -108,36 +159,34 @@ EnhancedVariableViewer::ViewerResult EnhancedVariableViewer::handleInput(int key
                 updateScrolling();
             }
             return ViewerResult::CONTINUE;
-            
         case KEY_DOWN:
-            if (currentSelection < variableList.size() - 1) {
+            if (currentSelection + 1 < filteredVariableList.size()) {
                 currentSelection++;
                 updateScrolling();
             }
             return ViewerResult::CONTINUE;
-            
         case KEY_ESCAPE:
             return ViewerResult::EXIT;
-            
         default:
             return ViewerResult::CONTINUE;
     }
 }
 
 void EnhancedVariableViewer::updateScrolling() {
-    if (variableList.empty()) return;
-    
+    if (filteredVariableList.empty()) return;
+    // 列表高度减去输入框那一行
+    int visibleListHeight = listHeight - 1;
     if (currentSelection < scrollOffset) {
         scrollOffset = currentSelection;
-    } else if (currentSelection >= scrollOffset + listHeight) {
-        scrollOffset = currentSelection - listHeight + 1;
+    } else if (currentSelection >= scrollOffset + visibleListHeight) {
+        scrollOffset = currentSelection - visibleListHeight + 1;
     }
     scrollOffset = std::max(size_t(0), scrollOffset);
 }
 
 void EnhancedVariableViewer::draw() {
     clearScreen();
-    
+
     // 绘制标题
     Terminal::setCursor(0, 0);
     Terminal::setForeground(Color::CYAN);
@@ -150,14 +199,14 @@ void EnhancedVariableViewer::draw() {
     }
     std::cout << header;
     Terminal::resetColor();
-    
+
     drawLayout();
 }
 
 void EnhancedVariableViewer::drawLayout() {
     drawVariableList();
     drawPreviewWindow();
-    
+
     // 绘制状态栏
     Terminal::setCursor(terminalRows - 1, 0);
     Terminal::setForeground(Color::BLACK);
@@ -169,19 +218,51 @@ void EnhancedVariableViewer::drawLayout() {
 }
 
 void EnhancedVariableViewer::drawVariableList() {
-    if (variableList.empty()) {
+    // 输入框
+    Terminal::setCursor(listStartRow, listStartCol);
+    Terminal::setForeground(Color::WHITE);
+    Terminal::setBackgroundRGB(45,63,118); // 深蓝色背景
+    std::string prompt = "筛选: ";
+    std::cout << prompt << filterInput;
+    // 光标模拟
+    Terminal::setBackground(Color::WHITE);
+    std::cout << " "; // 光标块
+    Terminal::resetColor();
+    // 补齐空格到列表宽度
+    size_t inputWidth = TuiUtils::calculateUtf8VisualWidth(prompt + filterInput) -1;
+    if (inputWidth < static_cast<size_t>(listWidth - 2)) {
+        Terminal::setBackgroundRGB(45,63,118); // 深蓝色背景
+        std::cout << std::string(listWidth - 2 - inputWidth, ' ');
+    } else {
+        // 如果输入过长，截断
+        std::string truncatedInput = TuiUtils::trimToUtf8VisualWidth(prompt + filterInput, listWidth - 2);
+        std::cout << truncatedInput;
+    }
+    Terminal::resetColor();
+
+    // 变量列表
+    int visibleListHeight = listHeight - 1;
+    if (filteredVariableList.empty()) {
         Terminal::setCursor(listStartRow + 1, listStartCol);
         Terminal::setForeground(Color::YELLOW);
-        std::cout << "没有已定义的变量";
+        std::cout << "没有匹配的变量";
         Terminal::resetColor();
+        // 清空剩余行
+        for (int i = 2; i < visibleListHeight; ++i) {
+            Terminal::setCursor(listStartRow + i, listStartCol);
+            std::cout << std::string(listWidth, ' ');
+        }
         return;
     }
 
-    for (int i = 0; i < listHeight && (scrollOffset + i) < variableList.size(); i++) {
+    for (int i = 0; i < visibleListHeight; i++) {
         size_t itemIndex = scrollOffset + i;
-        const auto& item = variableList[itemIndex];
-
-        Terminal::setCursor(listStartRow + i, listStartCol);
+        Terminal::setCursor(listStartRow + 1 + i, listStartCol);
+        if (itemIndex >= filteredVariableList.size()) {
+            std::cout << std::string(listWidth, ' ');
+            continue;
+        }
+        const auto& item = filteredVariableList[itemIndex];
 
         bool isSelected = (itemIndex == currentSelection);
         if (isSelected) {
@@ -248,18 +329,16 @@ void EnhancedVariableViewer::drawPreviewWindow() {
                       previewHeight + 2, previewWidth + 2, 
                       " 预览 ", Color::WHITE, Color::DEFAULT);
     
-    if (variableList.empty() || currentSelection >= variableList.size()) {
+    if (filteredVariableList.empty() || currentSelection >= filteredVariableList.size()) {
         Terminal::setCursor(previewStartRow + 1, previewStartCol + 1);
         Terminal::setForeground(Color::YELLOW);
         std::cout << "无变量可预览";
         Terminal::resetColor();
         return;
     }
-    
-    const auto& selectedItem = variableList[currentSelection];
+    const auto& selectedItem = filteredVariableList[currentSelection];
     const auto& vars = interpreter.getVariables();
     auto it = vars.find(selectedItem.name);
-    
     if (it != vars.end()) {
         drawPreviewContent(it->second);
     }

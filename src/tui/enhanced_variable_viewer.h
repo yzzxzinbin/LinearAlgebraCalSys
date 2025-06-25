@@ -5,6 +5,9 @@
 #include <vector>
 #include <utility> // For std::pair
 
+// 获得变量类型字符串
+extern std::string variableTypeString(const VariableType& type);
+
 class EnhancedVariableViewer {
 public:
     enum class ViewerResult {
@@ -21,8 +24,11 @@ public:
 
 private:
     std::vector<VariableItem> variableList;
+    std::vector<VariableItem> filteredVariableList; // 新增：过滤后的变量列表
     size_t currentSelection;
     size_t scrollOffset;
+
+    std::string filterInput; // 新增：过滤输入框内容
     
     int terminalRows;
     int terminalCols;
@@ -57,6 +63,8 @@ private:
     std::string getSizeInfo(const Variable& var) const;
     void updateStatus(const std::string& msg);
     void clearScreen();
+
+    void updateFilter(); // 新增：根据 filterInput 刷新 filteredVariableList
 
 public:
     EnhancedVariableViewer(const Interpreter& interp, int termRows, int termCols);
