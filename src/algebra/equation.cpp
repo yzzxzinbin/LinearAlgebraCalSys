@@ -113,7 +113,7 @@ std::string Equation::solve_linear() {
     }
     
     Fraction sol = -b.getRationalValue() / a.getRationalValue();
-    return variable_name + " = " + sol.toString();
+    return sol.toString(); // 只返回解的值，不包含变量名
 }
 
 // 返回所有解的字符串（二次方程只有一个解）
@@ -171,22 +171,28 @@ std::vector<std::string> Equation::solve_quadratic_all() {
 
 // 返回所有解的字符串（因式分解法）
 std::vector<std::string> Equation::solve_by_factoring_all() {
-    auto factors = poly_form.perform_factorization();
-    std::vector<std::string> sols;
-    for (const auto& f : factors) {
-        if (f.getDegree() == Fraction(1) && f.hasOnlyRationalCoefficients()) {
-            Fraction a, b(0);
-            for(const auto& term : f.getTerms()) {
-                if(term.power == Fraction(1)) a = term.coefficient.getRationalValue();
-                else if(term.power == Fraction(0)) b = term.coefficient.getRationalValue();
+    try {
+        // 使用新的完整因式分解算法
+        return poly_form.solve_all_roots();
+    } catch (const std::exception&) {
+        // 如果新算法失败，回退到原来的方法
+        auto factors = poly_form.perform_factorization();
+        std::vector<std::string> sols;
+        for (const auto& f : factors) {
+            if (f.getDegree() == Fraction(1) && f.hasOnlyRationalCoefficients()) {
+                Fraction a, b(0);
+                for(const auto& term : f.getTerms()) {
+                    if(term.power == Fraction(1)) a = term.coefficient.getRationalValue();
+                    else if(term.power == Fraction(0)) b = term.coefficient.getRationalValue();
+                }
+                Fraction sol = -b / a;
+                sols.push_back(sol.toString());
+            } else if (f.getDegree() > Fraction(0) && f.getTermCount() == 1) {
+                sols.push_back("0");
             }
-            Fraction sol = -b / a;
-            sols.push_back(sol.toString());
-        } else if (f.getDegree() > Fraction(0) && f.getTermCount() == 1) {
-            sols.push_back("0");
         }
+        return sols;
     }
-    return sols;
 }
 
 } // namespace Algebra
