@@ -350,54 +350,104 @@ void TuiApp::drawInputPrompt()
     if (matrixEditor) return; 
 
     // 先绘制候选框 (如果可见)
-    // 候选框的绘制位置需要基于当前光标正在编辑的词的起始位置
     if (suggestionBox->isVisible()) {
         size_t currentWordStartPosInString = 0;
-        getCurrentWordForSuggestion(currentWordStartPosInString); // Get the start index of the word in currentInput
-        // The column for suggestionBox->draw should be where this word starts on screen.
-        // currentWordStartPosInInput is the offset from "> "
+        getCurrentWordForSuggestion(currentWordStartPosInString);
         suggestionBox->draw(inputRow, 2, currentWordStartPosInString);
     }
-
 
     Terminal::setCursor(inputRow, 0);
     Terminal::setForeground(Color::GREEN);
     std::cout << "> ";
 
     // 清除旧的输入行内容
-    std::string spaces(terminalCols - 2, ' '); // -2 for "> "
+    std::string spaces(terminalCols - 2, ' ');
     std::cout << spaces;
 
-    // 重新定位光标以打印输入和模拟光标
+    // 重新定位光标以打印输入
     Terminal::setCursor(inputRow, 2);
 
-    // 打印光标前的部分
-    std::cout << currentInput.substr(0, cursorPosition);
+    // 查找需要高亮的括号对
+    TuiUtils::BracketPair pair = TuiUtils::findInnermostBracketPair(currentInput, cursorPosition);
+    bool highlightActive = (pair.openPos != std::string::npos && pair.closePos != std::string::npos && cursorPosition > pair.openPos);
 
-    // 模拟光标：反转颜色打印光标下的字符，或者打印特殊字符
-    // 保存当前颜色状态
-    // (如果 Terminal 类支持获取当前颜色会更好，这里假设默认是绿前景白背景)
-    
-    Terminal::setBackground(Color::WHITE); // 设置光标背景色
-    Terminal::setForeground(Color::BLACK); // 设置光标前景色
+    std::string beforeCursorStyled;
+    std::string atCursorStyled;
+    std::string afterCursorStyled;
 
-    if (cursorPosition < currentInput.length()) {
-        std::cout << currentInput[cursorPosition];
-                } else {
-        std::cout << " "; // 如果光标在末尾，显示一个空格作为光标块
+    // 构建带高亮的三段字符串：光标前，光标处，光标后
+    // 新的逻辑确保每个部分都有独立的、正确的样式
+    if (highlightActive) {
+        bool underlineOn = false;
+        auto manageUnderline = [&](std::string& target, bool shouldBeOn) {
+            if (shouldBeOn && !underlineOn) {
+                target += "\033[4m";
+                underlineOn = true;
+            } else if (!shouldBeOn && underlineOn) {
+                target += "\033[24m";
+                underlineOn = false;
+            }
+        };
+
+        // --- Part 1: Before Cursor ---
+        for (size_t i = 0; i < cursorPosition; ++i) {
+            manageUnderline(beforeCursorStyled, i > pair.openPos && i < pair.closePos);
+            std::string ch(1, currentInput[i]);
+            if (i == pair.openPos) beforeCursorStyled += "\033[1m" + ch + "\033[22m";
+            else beforeCursorStyled += ch;
+        }
+        manageUnderline(beforeCursorStyled, false); // 确保在光标前结束下划线
+
+        // --- Part 2: At Cursor ---
+        if (cursorPosition < currentInput.length()) {
+            underlineOn = false; // 为光标处重置状态
+            manageUnderline(atCursorStyled, cursorPosition > pair.openPos && cursorPosition < pair.closePos);
+            std::string ch(1, currentInput[cursorPosition]);
+            if (cursorPosition == pair.openPos || cursorPosition == pair.closePos) atCursorStyled += "\033[1m" + ch + "\033[22m";
+            else atCursorStyled += ch;
+            manageUnderline(atCursorStyled, false); // 确保在光标处结束下划线
+        }
+
+        // --- Part 3: After Cursor ---
+        underlineOn = false; // 为光标后重置状态
+        for (size_t i = cursorPosition + 1; i < currentInput.length(); ++i) {
+            manageUnderline(afterCursorStyled, i > pair.openPos && i < pair.closePos);
+            std::string ch(1, currentInput[i]);
+            if (i == pair.closePos) afterCursorStyled += "\033[1m" + ch + "\033[22m";
+            else afterCursorStyled += ch;
+        }
+        manageUnderline(afterCursorStyled, false); // 确保在结尾处结束下划线
+    } else {
+        // 无高亮，直接分割
+        beforeCursorStyled = currentInput.substr(0, cursorPosition);
+        if (cursorPosition < currentInput.length()) {
+            atCursorStyled = currentInput.substr(cursorPosition, 1);
+            afterCursorStyled = currentInput.substr(cursorPosition + 1);
+        }
     }
-    
-    Terminal::resetColor(); // 重置颜色到终端默认
-    Terminal::setForeground(Color::GREEN); // 重新应用绿色前景以打印光标后的文本
 
-    // 打印光标后的部分
+    // 打印光标前的内容
+    std::cout << beforeCursorStyled;
+
+    // 计算光标的视觉位置
+    size_t visualCursorPos = TuiUtils::calculateUtf8VisualWidth(beforeCursorStyled);
+
+    // 模拟光标：反转颜色打印光标下的字符
+    Terminal::setBackground(Color::WHITE);
+    Terminal::setForeground(Color::BLACK);
     if (cursorPosition < currentInput.length()) {
-        std::cout << currentInput.substr(cursorPosition + 1);
+        std::cout << atCursorStyled;
+    } else {
+        std::cout << " "; // 光标在行尾
     }
+    Terminal::resetColor();
+    Terminal::setForeground(Color::GREEN);
 
-    // 将真实的终端光标定位到我们模拟光标的逻辑位置之后
-    // 这样，如果终端本身也显示光标，它不会与我们的模拟光标重叠或错位
-    Terminal::setCursor(inputRow, 2 + cursorPosition +1);
+    // 打印光标后的内容
+    std::cout << afterCursorStyled;
+
+    // 将真实的终端光标定位到模拟光标位置之后
+    Terminal::setCursor(inputRow, 2 + visualCursorPos + 1);
 }
 
 void TuiApp::clearSuggestionArea() {

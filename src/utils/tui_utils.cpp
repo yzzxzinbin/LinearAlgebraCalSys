@@ -5,6 +5,7 @@
 #include <filesystem>     // C++17 for directory listing
 #include <algorithm>      // For std::sort, std::max
 #include <unordered_set>  // 新增：用于文件扩展名白名单
+#include <stack>          // 新增：用于括号匹配
 
 namespace fs = std::filesystem;
 
@@ -627,6 +628,105 @@ std::string stripAnsiEscape(const std::string& s) {
     }
     
     return out;
+}
+
+bool areBracketsBalanced(const std::string& text) {
+    std::stack<char> bracketStack;
+    
+    for (char c : text) {
+        if (c == '(' || c == '[' || c == '{') {
+            bracketStack.push(c);
+        } else if (c == ')' || c == ']' || c == '}') {
+            if (bracketStack.empty()) {
+                return false;
+            }
+            
+            char top = bracketStack.top();
+            bracketStack.pop();
+            
+            if ((c == ')' && top != '(') ||
+                (c == ']' && top != '[') ||
+                (c == '}' && top != '{')) {
+                return false;
+            }
+        }
+    }
+    
+    return bracketStack.empty();
+}
+
+BracketPair findInnermostBracketPair(const std::string& text, size_t cursorPos) {
+    BracketPair result = {std::string::npos, std::string::npos, '\0', '\0'};
+    
+    if (cursorPos > text.length()) {
+        return result;
+    }
+    
+    // 策略：寻找包含光标位置的最内层括号对
+    // 从光标位置向两边扫描，找到最近的匹配括号对
+    
+    size_t bestOpenPos = std::string::npos;
+    size_t bestClosePos = std::string::npos;
+    char bestOpenChar = '\0';
+    char bestCloseChar = '\0';
+    
+    // 尝试所有可能的开括号位置（从光标位置向左）
+    for (int openIdx = static_cast<int>(cursorPos); openIdx >= 0; --openIdx) {
+        char openChar = text[openIdx];
+        if (openChar != '(' && openChar != '[' && openChar != '{') {
+            continue;
+        }
+        
+        // 确定对应的闭括号
+        char closeChar;
+        switch (openChar) {
+            case '(': closeChar = ')'; break;
+            case '[': closeChar = ']'; break;
+            case '{': closeChar = '}'; break;
+            default: continue;
+        }
+        
+        // 从开括号位置向右查找对应的闭括号
+        int bracketCount = 1;
+        for (size_t closeIdx = openIdx + 1; closeIdx < text.length(); ++closeIdx) {
+            if (text[closeIdx] == openChar) {
+                bracketCount++;
+            } else if (text[closeIdx] == closeChar) {
+                bracketCount--;
+                if (bracketCount == 0) {
+                    // 找到匹配的括号对，检查光标是否在其中
+                    if (cursorPos > static_cast<size_t>(openIdx) && cursorPos < closeIdx) {
+                        // 光标在这个括号对内部，这是一个候选
+                        // 检查是否比之前找到的更内层（开括号更靠右）
+                        if (bestOpenPos == std::string::npos || static_cast<size_t>(openIdx) > bestOpenPos) {
+                            bestOpenPos = openIdx;
+                            bestClosePos = closeIdx;
+                            bestOpenChar = openChar;
+                            bestCloseChar = closeChar;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    
+    if (bestOpenPos != std::string::npos && bestClosePos != std::string::npos) {
+        result.openPos = bestOpenPos;
+        result.closePos = bestClosePos;
+        result.openChar = bestOpenChar;
+        result.closeChar = bestCloseChar;
+    }
+    
+    return result;
+}
+
+bool isCursorInBrackets(const std::string& text, size_t cursorPos) {
+    BracketPair pair = findInnermostBracketPair(text, cursorPos);
+    return (pair.openPos != std::string::npos && 
+            pair.closePos != std::string::npos &&
+            cursorPos > pair.openPos && 
+            cursorPos < pair.closePos);
 }
 
 } // namespace TuiUtils

@@ -60,4 +60,21 @@ std::vector<std::string> wordWrap(const std::string& text, size_t maxWidth);
 // 过滤 ANSI 转义序列
 std::string stripAnsiEscape(const std::string& s);
 
+// 新增：括号匹配和嵌套分析相关函数
+struct BracketPair {
+    size_t openPos;
+    size_t closePos;
+    char openChar;
+    char closeChar;
+};
+
+// 检查括号是否全部闭合
+bool areBracketsBalanced(const std::string& text);
+
+// 获取指定位置所在的最内层括号对
+BracketPair findInnermostBracketPair(const std::string& text, size_t cursorPos);
+
+// 检查指定位置是否在某个括号内
+bool isCursorInBrackets(const std::string& text, size_t cursorPos);
+
 } // namespace TuiUtils

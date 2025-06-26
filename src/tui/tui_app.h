@@ -103,11 +103,11 @@ private:
     
     // 辅助函数
     void printToResultView(const std::string& text, Color color = Color::DEFAULT);
-    std::string variableToString(const Variable& var);
+    static std::string variableToString(const Variable& var);
+    static std::string formatStringWithBracketHighlight(const std::string& text, size_t cursorPos); // 新增：带括号高亮的格式化函数
     std::vector<std::string> getVariableNames() const; // 新增：获取变量名列表
     std::string getCurrentWordForSuggestion(size_t& wordStartPosInInput) const; // 新增：获取当前输入单词以供建议
-                                                                            // wordStartPosInInput will be relative to currentInput string
-    
+
 public:
     TuiApp(const std::string& initialCommand = ""); // 修改构造函数以接受初始命令
     void run();

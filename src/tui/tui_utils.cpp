@@ -45,6 +45,44 @@ std::string TuiApp::variableToString(const Variable& var) {
     return ss.str();
 }
 
+std::string TuiApp::formatStringWithBracketHighlight(const std::string& text, size_t cursorPos) {
+    if (!TuiUtils::areBracketsBalanced(text)) {
+        return text; // 括号不平衡，不高亮
+    }
+    
+    if (!TuiUtils::isCursorInBrackets(text, cursorPos)) {
+        return text; // 光标不在括号内，不高亮
+    }
+    
+    TuiUtils::BracketPair pair = TuiUtils::findInnermostBracketPair(text, cursorPos);
+    if (pair.openPos == std::string::npos || pair.closePos == std::string::npos) {
+        return text;
+    }
+    
+    std::string result;
+    
+    // 开括号之前的部分
+    result += text.substr(0, pair.openPos);
+    
+    // 开括号
+    result += text[pair.openPos];
+    
+    // 括号内容（加下划线）
+    result += "\033[4m"; // ANSI下划线开始
+    result += text.substr(pair.openPos + 1, pair.closePos - pair.openPos - 1);
+    result += "\033[24m"; // ANSI下划线结束
+    
+    // 闭括号
+    result += text[pair.closePos];
+    
+    // 闭括号之后的部分
+    if (pair.closePos + 1 < text.length()) {
+        result += text.substr(pair.closePos + 1);
+    }
+    
+    return result;
+}
+
 std::string variableTypeString(const VariableType& type) {
     switch (type) {
         case VariableType::FRACTION: return "FRACTION";
