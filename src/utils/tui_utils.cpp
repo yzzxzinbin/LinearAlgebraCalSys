@@ -694,9 +694,9 @@ BracketPair findInnermostBracketPair(const std::string& text, size_t cursorPos) 
             } else if (text[closeIdx] == closeChar) {
                 bracketCount--;
                 if (bracketCount == 0) {
-                    // 找到匹配的括号对，检查光标是否在其中
-                    if (cursorPos > static_cast<size_t>(openIdx) && cursorPos < closeIdx) {
-                        // 光标在这个括号对内部，这是一个候选
+                    // 找到匹配的括号对，检查光标是否在其中（包括括号本身）
+                    if (cursorPos >= static_cast<size_t>(openIdx) && cursorPos <= closeIdx) {
+                        // 光标在这个括号对内部或括号上，这是一个候选
                         // 检查是否比之前找到的更内层（开括号更靠右）
                         if (bestOpenPos == std::string::npos || static_cast<size_t>(openIdx) > bestOpenPos) {
                             bestOpenPos = openIdx;
@@ -725,8 +725,8 @@ bool isCursorInBrackets(const std::string& text, size_t cursorPos) {
     BracketPair pair = findInnermostBracketPair(text, cursorPos);
     return (pair.openPos != std::string::npos && 
             pair.closePos != std::string::npos &&
-            cursorPos > pair.openPos && 
-            cursorPos < pair.closePos);
+            cursorPos >= pair.openPos && 
+            cursorPos <= pair.closePos);
 }
 
 } // namespace TuiUtils

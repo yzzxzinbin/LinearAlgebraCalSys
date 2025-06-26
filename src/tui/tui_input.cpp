@@ -369,54 +369,56 @@ void TuiApp::drawInputPrompt()
 
     // 查找需要高亮的括号对
     TuiUtils::BracketPair pair = TuiUtils::findInnermostBracketPair(currentInput, cursorPosition);
-    bool highlightActive = (pair.openPos != std::string::npos && pair.closePos != std::string::npos && cursorPosition > pair.openPos);
+    bool highlightActive = (pair.openPos != std::string::npos && pair.closePos != std::string::npos && cursorPosition >= pair.openPos);
 
     std::string beforeCursorStyled;
     std::string atCursorStyled;
     std::string afterCursorStyled;
 
-    // 构建带高亮的三段字符串：光标前，光标处，光标后
-    // 新的逻辑确保每个部分都有独立的、正确的样式
+    // 高亮逻辑：括号加粗，范围内内容下划线加粗
     if (highlightActive) {
-        bool underlineOn = false;
-        auto manageUnderline = [&](std::string& target, bool shouldBeOn) {
-            if (shouldBeOn && !underlineOn) {
-                target += "\033[4m";
-                underlineOn = true;
-            } else if (!shouldBeOn && underlineOn) {
-                target += "\033[24m";
-                underlineOn = false;
-            }
-        };
-
         // --- Part 1: Before Cursor ---
         for (size_t i = 0; i < cursorPosition; ++i) {
-            manageUnderline(beforeCursorStyled, i > pair.openPos && i < pair.closePos);
+            bool inBracket = (i > pair.openPos && i < pair.closePos);
             std::string ch(1, currentInput[i]);
-            if (i == pair.openPos) beforeCursorStyled += "\033[1m" + ch + "\033[22m";
-            else beforeCursorStyled += ch;
+            if (i == pair.openPos) {
+                beforeCursorStyled += "\033[1m" + ch + "\033[22m";
+            } else if (inBracket) {
+                beforeCursorStyled += "\033[1;4m" + ch + "\033[22;24m";
+            } else {
+                beforeCursorStyled += ch;
+            }
         }
-        manageUnderline(beforeCursorStyled, false); // 确保在光标前结束下划线
 
         // --- Part 2: At Cursor ---
         if (cursorPosition < currentInput.length()) {
-            underlineOn = false; // 为光标处重置状态
-            manageUnderline(atCursorStyled, cursorPosition > pair.openPos && cursorPosition < pair.closePos);
+            bool cursorInBracket = (cursorPosition > pair.openPos && cursorPosition < pair.closePos);
             std::string ch(1, currentInput[cursorPosition]);
-            if (cursorPosition == pair.openPos || cursorPosition == pair.closePos) atCursorStyled += "\033[1m" + ch + "\033[22m";
-            else atCursorStyled += ch;
-            manageUnderline(atCursorStyled, false); // 确保在光标处结束下划线
+            if (cursorPosition == pair.openPos || cursorPosition == pair.closePos)
+            {
+                // 光标在括号上：先加粗，然后反色显示
+                atCursorStyled += "\033[1m" + ch + "\033[22m";
+            } else if (cursorInBracket) {
+                // 光标在括号内：先加下划线和粗体，然后反色显示
+                atCursorStyled += "\033[1;4m" + ch + "\033[22;24m";
+            } else {
+                // 光标不在特殊位置：直接显示
+                atCursorStyled += ch;
+            }
         }
 
         // --- Part 3: After Cursor ---
-        underlineOn = false; // 为光标后重置状态
         for (size_t i = cursorPosition + 1; i < currentInput.length(); ++i) {
-            manageUnderline(afterCursorStyled, i > pair.openPos && i < pair.closePos);
+            bool inBracket = (i > pair.openPos && i < pair.closePos);
             std::string ch(1, currentInput[i]);
-            if (i == pair.closePos) afterCursorStyled += "\033[1m" + ch + "\033[22m";
-            else afterCursorStyled += ch;
+            if (i == pair.closePos) {
+                afterCursorStyled += "\033[1m" + ch + "\033[22m";
+            } else if (inBracket) {
+                afterCursorStyled += "\033[1;4m" + ch + "\033[22;24m";
+            } else {
+                afterCursorStyled += ch;
+            }
         }
-        manageUnderline(afterCursorStyled, false); // 确保在结尾处结束下划线
     } else {
         // 无高亮，直接分割
         beforeCursorStyled = currentInput.substr(0, cursorPosition);
@@ -432,15 +434,21 @@ void TuiApp::drawInputPrompt()
     // 计算光标的视觉位置
     size_t visualCursorPos = TuiUtils::calculateUtf8VisualWidth(beforeCursorStyled);
 
-    // 模拟光标：反转颜色打印光标下的字符
-    Terminal::setBackground(Color::WHITE);
-    Terminal::setForeground(Color::BLACK);
+    // 模拟光标：使用反色显示光标字符，同时保留原有样式
     if (cursorPosition < currentInput.length()) {
-        std::cout << atCursorStyled;
+        // 对于有内容的光标位置，使用反色+原样式
+        Terminal::setBackground(Color::BLACK);
+        Terminal::setForeground(Color::WHITE);
+        std::cout << "\033[7m" << atCursorStyled << "\033[27m";
+        Terminal::resetColor();
     } else {
-        std::cout << " "; // 光标在行尾
+        // 光标在行尾，显示反色空格
+        Terminal::setBackground(Color::WHITE);
+        Terminal::setForeground(Color::BLACK);
+        std::cout << " ";
+        Terminal::resetColor();
     }
-    Terminal::resetColor();
+    
     Terminal::setForeground(Color::GREEN);
 
     // 打印光标后的内容
