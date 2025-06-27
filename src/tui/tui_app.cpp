@@ -19,7 +19,7 @@ const std::vector<std::string> TuiApp::KNOWN_FUNCTIONS = {
 
 const std::vector<std::string> TuiApp::KNOWN_COMMANDS = {
     "help", "clear", "vars", "show", "exit", "steps", "new", "edit", "export", "import",
-    "del", "rename", "csv" 
+    "del", "rename", "csv" ,"convert"
 };
 
 

@@ -18,6 +18,7 @@
 #include "enhanced_matrix_editor.h"
 #include "enhanced_help_viewer.h"  // 新增：帮助查看器头文件
 #include "tui_suggestion_box.h"
+#include "../utils/convert_utils.h"
 
 
 void TuiApp::executeCommand(const std::string &input)
@@ -451,6 +452,48 @@ void TuiApp::executeCommand(const std::string &input)
                 statusMessage = helpViewer->getStatusMessage();
                 initUI(); // 重绘UI以适应帮助查看器
             }
+            return;
+        }
+
+        // 新增：处理convert命令
+        if (commandStr == "convert") {
+            if (commandArgs.size() != 2) {
+                throw std::runtime_error("convert 命令需要两个参数 (变量名和转换标志)。用法: convert <变量名> <-M|-v|-f>");
+            }
+            const std::string& varNameToConvert = commandArgs[0];
+            const std::string& flag = commandArgs[1];
+
+            const auto& vars = interpreter.getVariables();
+            auto it = vars.find(varNameToConvert);
+            if (it == vars.end()) {
+                throw std::runtime_error("变量 '" + varNameToConvert + "' 未定义。");
+            }
+
+            Variable newVar = ConvertUtils::convertVariable(it->second, flag);
+
+            std::string newVarName;
+            if (flag == "-m") {
+                newVarName = generateNewVariableName(true); // isMatrix = true
+            } else if (flag == "-v") {
+                newVarName = generateNewVariableName(false); // isMatrix = false
+            } else { // for -f, it's a fraction, not matrix or vector.
+                const auto& all_vars = interpreter.getVariables();
+                int i = 1;
+                std::string baseName = "f";
+                while (true) {
+                    newVarName = baseName + std::to_string(i);
+                    if (all_vars.find(newVarName) == all_vars.end()) {
+                        break;
+                    }
+                    i++;
+                }
+            }
+            
+            interpreter.getVariablesNonConst()[newVarName] = newVar;
+
+            std::string message = "变量 '" + varNameToConvert + "' 已成功转换为新变量 '" + newVarName + "'";
+            printToResultView(message, Color::YELLOW);
+            statusMessage = message;
             return;
         }
 
