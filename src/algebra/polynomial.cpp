@@ -456,10 +456,53 @@ namespace Algebra
             throw std::runtime_error("Negative exponents on polynomials not supported.");
         if (exp == 0)
             return Polynomial("1");
-        Polynomial result = base;
-        for (int i = 1; i < exp; ++i)
+        if (exp == 1)
+            return base;
+
+        // 优化1: 对二项式使用牛顿二项式定理
+        if (base.getTermCount() == 2)
         {
-            result = result * base;
+            auto terms = base.getTerms();
+            Monomial P = terms[0];
+            Monomial Q = terms[1];
+
+            Polynomial result;
+            result.variable_name = base.variable_name;
+            Fraction C_nk(1); // C(n,0) = 1
+
+            for (int k = 0; k <= exp; ++k)
+            {
+                // 计算项: C(n,k) * P^(exp-k) * Q^k
+                Monomial p_pow = pow(P, exp - k);
+                Monomial q_pow = pow(Q, k);
+                Monomial term = p_pow * q_pow;
+                term.coefficient = term.coefficient * SimplifiedRadical(C_nk);
+
+                result.terms.push_back(term);
+
+                // 更新 C(n,k) 为 C(n, k+1)
+                if (k < exp)
+                {
+                    C_nk = C_nk * Fraction(exp - k) / Fraction(k + 1);
+                }
+            }
+            result.simplify(); // 在所有项计算完毕后进行一次化简
+            return result;
+        }
+
+        // 优化2: 对通用多项式使用快速幂（平方求幂）算法
+        Polynomial result("1");
+        Polynomial current_power = base;
+        int current_exp = exp;
+
+        while (current_exp > 0)
+        {
+            if (current_exp % 2 == 1)
+            {
+                result = result * current_power;
+            }
+            current_power = current_power * current_power;
+            current_exp /= 2;
         }
         return result;
     }

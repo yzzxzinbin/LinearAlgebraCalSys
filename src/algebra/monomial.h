@@ -28,6 +28,9 @@ Monomial operator-(const Monomial& a);
 Monomial operator*(const Monomial& a, const Monomial& b);
 bool operator==(const Monomial& a, const Monomial& b);
 
+// 新增：单项式幂运算
+Monomial pow(const Monomial& base, int exp);
+
 } // namespace Algebra
 
 #endif // ALGEBRA_MONOMIAL_H

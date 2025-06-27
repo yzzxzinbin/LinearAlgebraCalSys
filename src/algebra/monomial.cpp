@@ -78,4 +78,25 @@ bool operator==(const Monomial& a, const Monomial& b) {
     return a.coefficient == b.coefficient && a.variable == b.variable && a.power == b.power;
 }
 
+// 新增：单项式幂运算
+Monomial pow(const Monomial& base, int exp) {
+    if (exp < 0) {
+        throw std::runtime_error("Negative exponents on monomials are not supported in this context.");
+    }
+    if (exp == 0) {
+        return Monomial(Fraction(1), "", 0);
+    }
+    if (exp == 1) {
+        return base;
+    }
+    if (base.coefficient.isZero()) {
+        if (exp > 0) return Monomial(Fraction(0), "", 0);
+        else throw std::runtime_error("0^0 or 0 to a negative power is undefined.");
+    }
+
+    SimplifiedRadical new_coeff = pow(base.coefficient, static_cast<long long>(exp));
+    Fraction new_power = base.power * Fraction(exp);
+    return Monomial(new_coeff, base.variable, new_power);
+}
+
 } // namespace Algebra

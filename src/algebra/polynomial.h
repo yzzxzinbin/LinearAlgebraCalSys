@@ -43,6 +43,8 @@ public:
     std::vector<Polynomial> complete_factorization() const; // 完整因式分解
     std::vector<std::string> solve_all_roots() const; // 求解所有根
 
+    friend Polynomial pow(const Polynomial& base, int exp);
+
 private:
     std::vector<Monomial> terms;
     std::string variable_name;
