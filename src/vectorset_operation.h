@@ -4,7 +4,7 @@
 #include "result.h"
 
 // 计算两个向量组的线性表示关系，返回Result类型
-Result RS_rep_vecset(const Matrix& set1, const Matrix& set2);
+Result rs_rep_vecset(const Matrix& set1, const Matrix& set2);
 
 // 新增：判断setA能否线性表示v，返回系数列或全0列
 Matrix rep_vecsingle(const Matrix& setA, const Vector& v);

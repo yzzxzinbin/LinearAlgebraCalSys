@@ -160,7 +160,7 @@ Matrix rep_vecsingle(const Matrix& setA, const Vector& v) {
     }
 }
 
-Result RS_rep_vecset(const Matrix& set1, const Matrix& set2) {
+Result rs_rep_vecset(const Matrix& set1, const Matrix& set2) {
     std::ostringstream oss;
     size_t n1 = set1.colCount(), n2 = set2.colCount();
     size_t rows = set1.rowCount();

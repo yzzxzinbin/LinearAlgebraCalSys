@@ -9,7 +9,7 @@ namespace ConvertUtils {
 /**
  * @brief Converts a variable from one type to another.
  * @param sourceVar The source variable to convert.
- * @param targetTypeFlag A flag indicating the target type ("-M", "-v", "-f").
+ * @param targetTypeFlag A flag indicating the target type ("-m", "-m1", "-m2", "-v", "-f").
  * @return A new Variable object with the converted value.
  * @throws std::runtime_error if the conversion is not supported.
  */

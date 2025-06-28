@@ -458,7 +458,7 @@ void TuiApp::executeCommand(const std::string &input)
         // 新增：处理convert命令
         if (commandStr == "convert") {
             if (commandArgs.size() != 2) {
-                throw std::runtime_error("convert 命令需要两个参数 (变量名和转换标志)。用法: convert <变量名> <-M|-v|-f>");
+                throw std::runtime_error("convert 命令需要两个参数 (变量名和转换标志)。用法: convert <变量名> <-m|-v|-f>");
             }
             const std::string& varNameToConvert = commandArgs[0];
             const std::string& flag = commandArgs[1];
@@ -474,12 +474,27 @@ void TuiApp::executeCommand(const std::string &input)
             std::string newVarName;
             if (flag == "-m") {
                 newVarName = generateNewVariableName(true); // isMatrix = true
+            } else if (flag == "-m1") {
+                newVarName = generateNewVariableName(true); // isMatrix = true
+            } else if (flag == "-m2") {
+                newVarName = generateNewVariableName(true); // isMatrix = true
             } else if (flag == "-v") {
                 newVarName = generateNewVariableName(false); // isMatrix = false
-            } else { // for -f, it's a fraction, not matrix or vector.
+            } else if (flag == "-f") { // for -f, it's a fraction, not matrix or vector.
                 const auto& all_vars = interpreter.getVariables();
                 int i = 1;
                 std::string baseName = "f";
+                while (true) {
+                    newVarName = baseName + std::to_string(i);
+                    if (all_vars.find(newVarName) == all_vars.end()) {
+                        break;
+                    }
+                    i++;
+                }
+            } else {
+                const auto& all_vars = interpreter.getVariables();
+                int i = 1;
+                std::string baseName = "newVar";
                 while (true) {
                     newVarName = baseName + std::to_string(i);
                     if (all_vars.find(newVarName) == all_vars.end()) {

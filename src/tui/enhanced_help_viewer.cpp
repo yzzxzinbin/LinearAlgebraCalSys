@@ -22,9 +22,9 @@ void EnhancedHelpViewer::initializeHelpContent() {
         "基础命令",
         {
             {"\033[1;36mhelp\033[22m", 
-             "显示此帮助信息，进入增强型帮助查看器。\n\n"
+             "进入帮助查看器。\n\n"
              "\033[1m操作:\033[0m\n"
-             "- \033[1;32m↑/↓\033[0m: 选择主题\n"
+             "- \033[1;32m↑/↓\033[0m: 选择条目\n"
              "- \033[1;32m←/→\033[0m: 翻页\n"
              "- \033[1;32mESC\033[0m: 退出\n"
              "\n\033[2m示例:\033[0m\n"
@@ -84,6 +84,31 @@ void EnhancedHelpViewer::initializeHelpContent() {
              "\033[36m= 0.5\033[0m\n"
              "\033[1;33m> show m1 -p2\033[0m\n"
              "\033[36m| 1.00 2.00 3.00 |\n| 4.00 5.00 6.00 |\033[0m"
+            },
+            {"\033[1;36mconvert\033[22m",
+             "将一个变量转换为另一种类型。\n\n"
+             "\033[1m用法:\033[0m\n"
+             "- convert <源变量> -m  将源变量转为Matrix\n"
+             "- convert <源变量> -v  将源变量转为Vector\n"
+             "- convert <源变量> -f  将源变量转为Fraction\n"
+             "\n\033[1m说明:\033[0m\n"
+             "此命令用于将某些操作（如 `rs_rep_vecset`）返回的通用 `Result` 类型变量以及方程组解EQUATION_SOLUTION类型，转换为可解析可计算的 `Matrix`, `Vector`, 或 `Fraction` 类型，以便进行后续计算。\n"
+             "此外，`convert` 也可以用于单列矩阵和向量之间的转换。\n"
+             "\n\033[2m示例:\033[0m\n"
+             "\033[1;33m> res = solveq(A, b)     # res 是 EQUATION_SOLUTION 类型\n"
+             "> convert res -v                 # 将 res 转为向量\033[0m\n"
+             "\033[36m[效果: 创建一个名为 v1 的向量变量，值为Ax=b的解]\033[0m"
+             "\n\033[2m示例2:\033[0m\n"
+             "\033[1;33m> m1 = [1,2,3,4]     # m1 是矩阵\n"
+             "> convert m1 -v               # 将 m1 转为向量\033[0m\n"
+             "\033[36m[效果: 创建一个名为 v1 的向量变量，值为 m1 的第一列]\033[0m"
+             "\n\033[2m示例3:\033[0m\n"
+             "\033[1;33m> A = [1,2,3;6,5,4;8,7,9]       # A 是矩阵\n"
+             "\033[1;33m> B =  transpose(A)          # 转置 A\n"
+             "\033[1;33m> RS1 = rs_rep_vecset(A,B)      # 返回一个 Result 类型变量RS1\n"
+             "\033[1;33m> convert RS1 -m1         # 将A线性表示B的系数矩阵提取出来(如果存在)\n"
+             "\033[1;33m> convert RS1 -m2         # 将B线性表示A的系数矩阵提取出来(如果存在)\033[0m\n"
+             "\033[36m[效果: 提取线性表示分析函数的系数矩阵]\033[0m"
             },
             {"\033[1;36mdel\033[22m", 
              "删除指定的变量。\n\n"
@@ -289,16 +314,17 @@ void EnhancedHelpViewer::initializeHelpContent() {
         }
     });
 
-    // 第4页：高级功能
+    // 第4页：进阶函数
     helpPages.push_back({
-        "高级功能",
+        "进阶函数",
         {
             {"\033[1;36mdiag()\033[22m", 
              "使用向量创建对角矩阵。\n\n"
              "\033[1m用法:\033[0m diag(vector)\n"
              "\n\033[2m示例:\033[0m\n"
-             "\033[1;33m> v = [1,2,3]\n> diagonal = diag(v)\033[0m\n"
+             "\033[1;33m> v = [1,2,3]\n> diagonal1 = diag(v)\033[0m\n"
              "\033[1;33m> diagonal2 = diag(1, 2, 3)\033[0m\n"
+             "\033[1;33m> diagonal3 = diag([1, 2, 3])\033[0m\n"
              "\033[36m[效果: diagonal 为3×3对角矩阵]\033[0m\n"
              "\ndiagnal = \n"
                 "    \033[36m|\033[0m 1 0 0 \033[36m|\033[0m\n"
@@ -321,11 +347,11 @@ void EnhancedHelpViewer::initializeHelpContent() {
              "\033[1;33m> combined = union_rref(m1, m2)\033[0m\n"
              "\033[36m[效果: 结果为合并并化简后的矩阵]\033[0m"
             },
-            {"\033[1;36mRS_rep_vecset()\033[22m", 
+            {"\033[1;36mrs_rep_vecset()\033[22m", 
              "计算向量组的线性表示。\n\n"
-             "\033[1m用法:\033[0m RS_rep_vecset(A, B)\n"
+             "\033[1m用法:\033[0m rs_rep_vecset(A, B)\n"
              "\n\033[2m示例:\033[0m\n"
-             "\033[1;33m> representation = RS_rep_vecset(m1, m2)\033[0m\n"
+             "\033[1;33m> representation = rs_rep_vecset(m1, m2)\033[0m\n"
              "\033[36m[效果: 解析A B是否能互相线性表示]\033[0m"
             },
             {"\033[1;36mrep_vecsingle()\033[22m", 
