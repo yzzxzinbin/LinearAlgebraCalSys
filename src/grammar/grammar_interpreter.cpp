@@ -7,6 +7,7 @@
 #include <fstream> // 用于文件操作
 #include "../utils/logger.h" // 用于日志记录
 #include "../algebra_operation.h" // 新增：代数运算
+#include "../algebra/polynomial_matrix.h" // 新增：多项式矩阵
 #include "../similar_matrix_operations.h" // 新增包含
 #include "../tui/tui_app.h" // 新增包含以访问 TuiApp::KNOWN_COMMANDS
 #include "../vectorset_operation.h" // 新增包含
@@ -441,6 +442,12 @@ Variable Interpreter::executeFunctionCall(const FunctionCallNode* node) {
         if (args.size() != 1 || args[0].type != VariableType::MATRIX)
             throw std::runtime_error("max_independentset_row函数需要一个矩阵参数");
         return Variable(max_independentset_row(args[0].matrixValue));
+    } else if (funcNameLower == "eigenvalues") { // 新增：特征值计算
+        if (args.size() != 1 || args[0].type != VariableType::MATRIX) {
+            throw std::runtime_error("eigenvalues函数需要一个矩阵参数");
+        }
+        std::string result_str = Algebra::calculate_eigenvalues(args[0].matrixValue);
+        return Variable(Result(result_str));
     } else {
         throw std::runtime_error("未知函数: " + funcNameOriginal);
     }
