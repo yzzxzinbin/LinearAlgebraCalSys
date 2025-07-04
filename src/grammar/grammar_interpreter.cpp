@@ -442,9 +442,9 @@ Variable Interpreter::executeFunctionCall(const FunctionCallNode* node) {
         if (args.size() != 1 || args[0].type != VariableType::MATRIX)
             throw std::runtime_error("max_independentset_row函数需要一个矩阵参数");
         return Variable(max_independentset_row(args[0].matrixValue));
-    } else if (funcNameLower == "eigenvalues") { // 新增：特征值计算
+    } else if (funcNameLower == "rs_eigenvalues") { // 新增：特征值计算
         if (args.size() != 1 || args[0].type != VariableType::MATRIX) {
-            throw std::runtime_error("eigenvalues函数需要一个矩阵参数");
+            throw std::runtime_error("rs_eigenvalues函数需要一个矩阵参数");
         }
         std::string result_str = Algebra::calculate_eigenvalues(args[0].matrixValue);
         return Variable(Result(result_str));
