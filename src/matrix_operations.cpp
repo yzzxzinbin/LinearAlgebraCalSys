@@ -331,7 +331,7 @@ Fraction MatrixOperations::determinant(const Matrix& mat, OperationHistory& hist
     Matrix copy = mat;
     
     std::stringstream initial;
-    initial << "计算行列式的初始矩阵 (当前因子: 1)";
+    initial << "计算行列式的初始矩阵";
     history.addStep(OperationStep(
         OperationType::INITIAL_STATE,
         initial.str(),
@@ -339,7 +339,6 @@ Fraction MatrixOperations::determinant(const Matrix& mat, OperationHistory& hist
     ));
     
     Fraction det(1); // 行列式的值
-    int sign = 1;    // 交换行时的符号
     
     size_t lead = 0;
     for (size_t r = 0; r < n; ++r) {
@@ -347,21 +346,16 @@ Fraction MatrixOperations::determinant(const Matrix& mat, OperationHistory& hist
             break;
         }
         
-        // 找到当前列最大绝对值的元素（为了数值稳定性）
-        size_t maxRow = r;
-        for (size_t i = r + 1; i < n; ++i) {
-            // 这里我们没有真正比较绝对值，因为Fraction没有实现abs
-            // 在实际应用中，应该比较绝对值
-            if (copy.at(i, lead) > copy.at(maxRow, lead) || 
-                copy.at(maxRow, lead) == Fraction(0)) {
-                maxRow = i;
-            }
+        // 找到当前列第一个非零的行作为主元行
+        size_t pivotRow = r;
+        while (pivotRow < n && copy.at(pivotRow, lead) == Fraction(0)) {
+            pivotRow++;
         }
         
-        if (copy.at(maxRow, lead) == Fraction(0)) {
-            // 如果主元为0，则行列式为0
+        if (pivotRow == n) {
+            // 如果主元列全为0，则行列式为0
             std::stringstream ss;
-            ss << "主元为0，行列式为0 (当前累积因子: " << (sign > 0 ? "" : "-") << det << ")";
+            ss << "第 " << (lead + 1) << " 列主元位置及下方全为0，行列式为0";
             history.addStep(OperationStep(
                 OperationType::RESULT_STATE,
                 ss.str(),
@@ -371,80 +365,39 @@ Fraction MatrixOperations::determinant(const Matrix& mat, OperationHistory& hist
         }
         
         // 交换行
-        if (maxRow != r) {
-            for (size_t j = 0; j < n; ++j) {
-                Fraction temp = copy.at(r, j);
-                copy.at(r, j) = copy.at(maxRow, j);
-                copy.at(maxRow, j) = temp;
-            }
-            
-            sign = -sign; // 交换行改变行列式符号
-            
-            std::stringstream ss;
-            ss << "交换第 " << (r + 1) << " 行和第 " << (maxRow + 1) 
-               << " 行 (符号变为: " << (sign > 0 ? "+" : "-") 
-               << ", 当前累积因子: " << (sign > 0 ? "" : "-") << det << ")";
-            history.addStep(OperationStep(
-                OperationType::SWAP_ROWS,
-                ss.str(),
-                copy,
-                r, maxRow
-            ));
+        if (pivotRow != r) {
+            // 直接调用已有的行交换函数
+            swapRows(copy, r, pivotRow, history);
+            // 交换行改变行列式符号
+            det *= Fraction(-1); 
         }
         
         // 当前主元
         Fraction pivot = copy.at(r, lead);
-        det = det * pivot; // 累乘主元得到行列式
-        
-        std::stringstream ss_pivot;
-        ss_pivot << "主元 " << pivot << " 加入计算 (当前累积因子: " 
-                 << (sign > 0 ? "" : "-") << det << ")";
-        history.addStep(OperationStep(
-            OperationType::RESULT_STATE,
-            ss_pivot.str(),
-            copy
-        ));
-        
-        // 归一化当前行（仅用于显示，不影响行列式计算）
-        for (size_t j = lead; j < n; ++j) {
-            copy.at(r, j) = copy.at(r, j) / pivot;
-        }
-        
-        std::stringstream ss;
-        ss << "将第 " << (r + 1) << " 行除以主元 " << pivot;
-        history.addStep(OperationStep(
-            OperationType::SCALE_ROW,
-            ss.str(),
-            copy,
-            r, -1, Fraction(1) / pivot
-        ));
         
         // 消元
         for (size_t i = r + 1; i < n; ++i) {
             Fraction factor = copy.at(i, lead);
-            for (size_t j = lead; j < n; ++j) {
-                copy.at(i, j) = copy.at(i, j) - copy.at(r, j) * factor;
-            }
-            
             if (factor != Fraction(0)) {
-                std::stringstream ss2;
-                ss2 << "将第 " << (r + 1) << " 行乘以 " << -factor << " 加到第 " << (i + 1) << " 行";
-                history.addStep(OperationStep(
-                    OperationType::ADD_SCALED_ROW,
-                    ss2.str(),
-                    copy,
-                    i, r, -factor
-                ));
+                // 计算消元因子
+                Fraction elimFactor = -factor / pivot;
+                // 直接调用已有的行加法函数
+                addScaledRow(copy, i, r, elimFactor, history);
             }
         }
         
         ++lead;
     }
     
-    Fraction finalDet = Fraction(sign) * det;
+    // 消元结束后，矩阵变为上三角矩阵
+    // 行列式的值等于主对角线上元素的乘积，再乘以因行交换产生的符号因子
+    for (size_t i = 0; i < n; ++i) {
+        det *= copy.at(i, i);
+    }
+
+    Fraction finalDet = det;
     std::stringstream final;
-    final << "行列式计算完成，值为: " << finalDet 
-          << " (" << (sign > 0 ? "" : "-") << det << ")";
+    final << "矩阵已化为上三角形式，主对角线元素相乘得到行列式，值为: " << finalDet;
     history.addStep(OperationStep(
         OperationType::RESULT_STATE,
         final.str(),
